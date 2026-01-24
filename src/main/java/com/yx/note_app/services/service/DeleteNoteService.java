@@ -45,9 +45,4 @@ public class DeleteNoteService extends Service <DeleteNoteRequest, ApiResponse> 
     public boolean paramCheck(DeleteNoteRequest request){
         return super.paramCheck(request) && Objects.nonNull(request.getNoteId());
     }
-
-    @Override
-    public void determineIfNeedTokenValidation() {
-        setNeedTokenValidation(true);
-    }
 }

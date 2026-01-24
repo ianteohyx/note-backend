@@ -72,10 +72,4 @@ public class UpdateShareNotePermissionService extends Service <UpdateShareNotePe
                 && Objects.nonNull(request.getNoteId())
                 && Objects.nonNull(request.getPermission());
     }
-
-
-    @Override
-    public void determineIfNeedTokenValidation() {
-        setNeedTokenValidation(true);
-    }
 }

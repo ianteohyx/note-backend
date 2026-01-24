@@ -44,11 +44,6 @@ public class GetSingleNoteService extends Service <GetSingleNoteRequest, ApiResp
         return buildGetSingleNoteResponse(note);
     }
 
-    @Override
-    public void determineIfNeedTokenValidation() {
-        setNeedTokenValidation(true);
-    }
-
     public GetSingleNoteResponse buildGetSingleNoteResponse(Note note){
         GetSingleNoteResponse getSingleNoteResponse = new GetSingleNoteResponse();
         Note2NoteDto note2NoteDto = new Note2NoteDto();

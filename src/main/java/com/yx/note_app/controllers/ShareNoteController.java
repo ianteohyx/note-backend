@@ -37,32 +37,36 @@ public class ShareNoteController {
     }
 
     @GetMapping("/getAllSharedToMe")
-    public ApiResponse getAllSharedToMe(@RequestBody ApiRequest request){
-        return getAllSharedToMeService.execute(request);
+    public ApiResponse getAllSharedToMe() {
+        return getAllSharedToMeService.execute(new ApiRequest());
     }
 
     @GetMapping("/getSingleSharedNote")
-    public ApiResponse getSingleSharedNote(@RequestBody GetSingleSharedNoteRequest request){
+    public ApiResponse getSingleSharedNote(@RequestParam Integer sharedNoteId) {
+        GetSingleSharedNoteRequest request = new GetSingleSharedNoteRequest();
+        request.setSharedNoteId(sharedNoteId);
         return getSingleSharedNoteService.execute(request);
     }
 
     @PatchMapping("/editSharedNote")
-    public ApiResponse editSharedNote(@RequestBody EditShareNoteRequest request){
+    public ApiResponse editSharedNote(@RequestBody EditShareNoteRequest request) {
         return editSharedNoteService.execute(request);
     }
 
     @GetMapping("/getAllSharedToUser")
-    public ApiResponse getSharedToUser(@RequestBody GetSharedToUsersRequest request){
+    public ApiResponse getSharedToUser(@RequestParam Integer noteId) {
+        GetSharedToUsersRequest request = new GetSharedToUsersRequest();
+        request.setId(noteId);
         return getSharedToUsersService.execute(request);
     }
 
     @DeleteMapping("/unshareUser")
-    public ApiResponse unshareNote(@RequestBody UnshareNoteRequest request){
+    public ApiResponse unshareNote(@RequestBody UnshareNoteRequest request) {
         return unshareNoteService.execute(request);
     }
 
     @PatchMapping("/updatePermission")
-    public ApiResponse updatePermission(@RequestBody UpdateShareNotePermissionRequest request){
+    public ApiResponse updatePermission(@RequestBody UpdateShareNotePermissionRequest request) {
         return updateShareNotePermissionService.execute(request);
     }
 

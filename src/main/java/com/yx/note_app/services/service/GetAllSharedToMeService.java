@@ -31,12 +31,7 @@ public class GetAllSharedToMeService extends Service <ApiRequest, GetAllSharedTo
 
     @Override
     public boolean paramCheck(ApiRequest request){
-        return super.paramCheck(request) && Objects.nonNull(request.getToken());
-    }
-
-    @Override
-    public void determineIfNeedTokenValidation() {
-        setNeedTokenValidation(true);
+        return super.paramCheck(request);
     }
 
     public GetAllSharedToMeResponse buildSuccessGetAllSharedNotes(List<SharedNote> sharedNotes){

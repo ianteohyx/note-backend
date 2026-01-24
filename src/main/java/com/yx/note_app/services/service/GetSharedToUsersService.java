@@ -54,11 +54,6 @@ public class GetSharedToUsersService extends Service<GetSharedToUsersRequest, Ap
                 && Objects.nonNull(request.getNoteId());
     }
 
-    @Override
-    public void determineIfNeedTokenValidation() {
-        setNeedTokenValidation(true);
-    }
-
     public GetSharedToUsersResponse buildSuccessSharedToUserResponse(List<String> usernames){
         GetSharedToUsersResponse getSharedToUsersResponse = new GetSharedToUsersResponse();
         getSharedToUsersResponse.setUsernames(usernames);

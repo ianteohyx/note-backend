@@ -24,11 +24,6 @@ public class SignUpService extends Service<SignUpRequest, ApiResponse>{
     }
 
     @Override
-    public void determineIfNeedTokenValidation() {
-        setNeedTokenValidation(false);
-    }
-
-    @Override
     public ApiResponse doService(SignUpRequest request) {
         if (userRepository.existsByUsername(request.getUsername())){
             logger.log("username already exist: " + request.getUsername());

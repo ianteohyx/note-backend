@@ -72,11 +72,6 @@ public class ShareNoteToOthersService extends Service<ShareNoteToRequest, ApiRes
                 && Objects.nonNull(shareNoteToRequest.getPermission());
     }
 
-    @Override
-    public void determineIfNeedTokenValidation() {
-        setNeedTokenValidation(true);
-    }
-
     public SharedNote buildSharedNote(Note sharedNote, User shareToUser, Permission permission){
         SharedNote newSharedNote = new SharedNote();
         newSharedNote.setNote(sharedNote);

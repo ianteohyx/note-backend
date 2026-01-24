@@ -42,14 +42,8 @@ public class UpdateNoteService extends Service <UpdateNoteRequest, ApiResponse>{
     @Override
     public boolean paramCheck(UpdateNoteRequest request){
         return super.paramCheck(request)
-                && Objects.nonNull(request.getToken())
                 && Objects.nonNull(request.getNoteId())
                 && Objects.nonNull(request.getNoteTitle())
                 && Objects.nonNull(request.getNoteContent());
-    }
-
-    @Override
-    public void determineIfNeedTokenValidation() {
-        setNeedTokenValidation(true);
     }
 }

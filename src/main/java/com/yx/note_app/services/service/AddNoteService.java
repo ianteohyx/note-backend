@@ -26,14 +26,8 @@ public class AddNoteService extends Service<AddNoteRequest, ApiResponse>{
     @Override
     public boolean paramCheck(AddNoteRequest request) {
         return super.paramCheck(request)
-                && Objects.nonNull(request.getToken())
                 && Objects.nonNull(request.getNoteTitle())
                 && Objects.nonNull(request.getNoteContent());
-    }
-
-    @Override
-    public void determineIfNeedTokenValidation() {
-        setNeedTokenValidation(true);
     }
 
     public Note buildNote(AddNoteRequest request){

@@ -48,12 +48,6 @@ public class GetSingleSharedNoteService extends Service<GetSingleSharedNoteReque
         return super.paramCheck(request) && Objects.nonNull(request.getSharedNoteId());
     }
 
-
-    @Override
-    public void determineIfNeedTokenValidation() {
-        setNeedTokenValidation(true);
-    }
-
     public GetSingleSharedNoteResponse buildSuccessGetSingleSharedNote(SharedNote sharedNote){
         // map to DTO
         SharedNote2SharedNoteDto sharedNote2SharedNoteDto = new SharedNote2SharedNoteDto();

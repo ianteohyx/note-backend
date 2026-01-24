@@ -30,12 +30,7 @@ public class GetAllNotesService extends Service <ApiRequest, GetAllNoteResponse>
 
     @Override
     public boolean paramCheck(ApiRequest request) {
-        return super.paramCheck(request) && Objects.nonNull(request.getToken());
-    }
-
-    @Override
-    public void determineIfNeedTokenValidation() {
-        setNeedTokenValidation(true);
+        return super.paramCheck(request);
     }
 
     public GetAllNoteResponse buildSuccessGetAllNotesResponse(List<Note> notes){

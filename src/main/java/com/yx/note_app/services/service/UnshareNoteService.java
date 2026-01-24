@@ -71,9 +71,4 @@ public class UnshareNoteService extends Service <UnshareNoteRequest, ApiResponse
                 && Objects.nonNull(request.getSharedToUsername())
                 && Objects.nonNull(request.getNoteId());
     }
-
-    @Override
-    public void determineIfNeedTokenValidation() {
-        setNeedTokenValidation(true);
-    }
 }

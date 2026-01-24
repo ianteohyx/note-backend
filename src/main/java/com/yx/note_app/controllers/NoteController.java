@@ -30,13 +30,15 @@ public class NoteController {
     }
 
     @GetMapping("/getAll")
-    public ApiResponse getAllNotes(@RequestBody ApiRequest apiRequest){
-        return getAllNotesService.execute(apiRequest);
+    public ApiResponse getAllNotes() {
+        return getAllNotesService.execute(new ApiRequest());
     }
 
     @GetMapping("/getSingle")
-    public ApiResponse getNoteById(@RequestBody GetSingleNoteRequest getSingleNoteRequest) {
-        return getSingleNoteService.execute(getSingleNoteRequest);
+    public ApiResponse getNoteById(@RequestParam Integer noteId) {
+        GetSingleNoteRequest request = new GetSingleNoteRequest();
+        request.setNoteId(noteId);
+        return getSingleNoteService.execute(request);
     }
 
     @PatchMapping("/update")

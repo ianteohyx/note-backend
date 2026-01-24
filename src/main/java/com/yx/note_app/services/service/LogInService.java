@@ -7,6 +7,7 @@ import com.yx.note_app.services.reponse.ApiResponse;
 import com.yx.note_app.services.reponse.LoginResponse;
 import com.yx.note_app.services.reponse.ResponseDirectory;
 import com.yx.note_app.services.request.LoginRequest;
+import com.yx.note_app.utils.jwt.JwtUtils;
 import com.yx.note_app.utils.log.DefaultLogger;
 import org.springframework.beans.factory.annotation.Autowired;
 import java.util.Objects;
@@ -16,16 +17,15 @@ import java.util.Optional;
 public class LogInService extends Service<LoginRequest, ApiResponse>{
     @Autowired
     private UserRepository userRepository;
+
+    @Autowired
+    private JwtUtils jwtUtils;
+
     private final DefaultLogger logger = new DefaultLogger(this.getClass());
 
     @Override
     public boolean paramCheck(LoginRequest request) {
         return super.paramCheck(request) && Objects.nonNull(request.getUsername()) && Objects.nonNull(request.getPassword());
-    }
-
-    @Override
-    public void determineIfNeedTokenValidation() {
-        setNeedTokenValidation(false);
     }
 
     @Override

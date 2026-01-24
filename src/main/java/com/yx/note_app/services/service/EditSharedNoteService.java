@@ -49,9 +49,4 @@ public class EditSharedNoteService extends Service <EditShareNoteRequest, ApiRes
                 && Objects.nonNull(request.getUpdatedShareNoteTitle())
                 && Objects.nonNull(request.getUpdatedShareNoteContent());
     }
-
-    @Override
-    public void determineIfNeedTokenValidation() {
-        setNeedTokenValidation(true);
-    }
 }
