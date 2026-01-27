@@ -8,12 +8,16 @@ import com.yx.note_app.services.reponse.ResponseDirectory;
 import com.yx.note_app.services.request.SignUpRequest;
 import com.yx.note_app.utils.log.DefaultLogger;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import java.util.Objects;
 
 @org.springframework.stereotype.Service
 public class SignUpService extends Service<SignUpRequest, ApiResponse>{
     @Autowired
     private UserRepository userRepository;
+
+    @Autowired
+    private PasswordEncoder passwordEncoder;
 
     private final DefaultLogger logger = new DefaultLogger(this.getClass());
 
@@ -43,7 +47,7 @@ public class SignUpService extends Service<SignUpRequest, ApiResponse>{
     public User buildUser(SignUpRequest request){
         User user = new User();
         user.setUsername(request.getUsername());
-        user.setPassword(request.getPassword());
+        user.setPassword(passwordEncoder.encode(request.getPassword()));
         return user;
     }
 

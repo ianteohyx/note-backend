@@ -10,6 +10,7 @@ import com.yx.note_app.services.request.LoginRequest;
 import com.yx.note_app.utils.jwt.JwtUtils;
 import com.yx.note_app.utils.log.DefaultLogger;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import java.util.Objects;
 import java.util.Optional;
 
@@ -20,6 +21,9 @@ public class LogInService extends Service<LoginRequest, ApiResponse>{
 
     @Autowired
     private JwtUtils jwtUtils;
+
+    @Autowired
+    private PasswordEncoder passwordEncoder;
 
     private final DefaultLogger logger = new DefaultLogger(this.getClass());
 
@@ -32,7 +36,7 @@ public class LogInService extends Service<LoginRequest, ApiResponse>{
     public ApiResponse doService(LoginRequest request) {
             Optional<User> actualUser = userRepository.findByUsername(request.getUsername());
 
-            if (actualUser.isPresent() && request.getPassword().equals(actualUser.get().getPassword())) {
+            if (actualUser.isPresent() && passwordEncoder.matches(request.getPassword(), actualUser.get().getPassword())) {
                 logger.log("login success: " + request.getUsername());
                 return buildSuccessLoginResponse(jwtUtils.generateToken(actualUser.get()));
             }
