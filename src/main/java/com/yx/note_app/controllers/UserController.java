@@ -6,10 +6,12 @@ import com.yx.note_app.services.reponse.ApiResponse;
 import com.yx.note_app.services.request.LoginRequest;
 import com.yx.note_app.services.request.SignUpRequest;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
-@RequestMapping("/api/user")
+@RequestMapping("/api/users")
 public class UserController {
 
     @Autowired
@@ -19,12 +21,17 @@ public class UserController {
     private LogInService logInService;
 
     @PostMapping("/signup")
-    public ApiResponse createUser(@RequestBody SignUpRequest signUpRequest) {
-        return signUpService.execute(signUpRequest);
+    public ResponseEntity<ApiResponse> createUser(@RequestBody SignUpRequest signUpRequest) {
+        ApiResponse response = signUpService.execute(signUpRequest);
+        HttpStatus status = response.getResponseOutcome().getSuccess()
+            ? HttpStatus.CREATED
+            : response.getResponseOutcome().getHttpStatus();
+        return ResponseEntity.status(status).body(response);
     }
 
     @PostMapping("/login")
-    public ApiResponse verifyUser(@RequestBody LoginRequest loginRequest){
-        return logInService.execute(loginRequest);
+    public ResponseEntity<ApiResponse> verifyUser(@RequestBody LoginRequest loginRequest) {
+        ApiResponse response = logInService.execute(loginRequest);
+        return ResponseEntity.status(response.getResponseOutcome().getHttpStatus()).body(response);
     }
 }

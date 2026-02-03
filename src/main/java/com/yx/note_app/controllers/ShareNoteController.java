@@ -4,10 +4,12 @@ import com.yx.note_app.services.reponse.ApiResponse;
 import com.yx.note_app.services.request.*;
 import com.yx.note_app.services.service.*;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
-@RequestMapping("/api/shared")
+@RequestMapping("/api/shares")
 public class ShareNoteController {
 
     @Autowired
@@ -31,43 +33,59 @@ public class ShareNoteController {
     @Autowired
     UpdateShareNotePermissionService updateShareNotePermissionService;
 
-    @PostMapping("/toOther")
-    public ApiResponse shareToOther(@RequestBody ShareNoteToRequest shareNoteToRequest) {
-        return shareNoteToOthersService.execute(shareNoteToRequest);
+    @PostMapping
+    public ResponseEntity<ApiResponse> shareToOther(@RequestBody ShareNoteToRequest shareNoteToRequest) {
+        ApiResponse response = shareNoteToOthersService.execute(shareNoteToRequest);
+        HttpStatus status = response.getResponseOutcome().getSuccess()
+            ? HttpStatus.CREATED
+            : response.getResponseOutcome().getHttpStatus();
+        return ResponseEntity.status(status).body(response);
     }
 
-    @GetMapping("/getAllSharedToMe")
-    public ApiResponse getAllSharedToMe() {
-        return getAllSharedToMeService.execute(new ApiRequest());
+    @GetMapping("/received")
+    public ResponseEntity<ApiResponse> getAllSharedToMe() {
+        ApiResponse response = getAllSharedToMeService.execute(new ApiRequest());
+        return ResponseEntity.status(response.getResponseOutcome().getHttpStatus()).body(response);
     }
 
-    @GetMapping("/getSingleSharedNote")
-    public ApiResponse getSingleSharedNote(@RequestParam Integer sharedNoteId) {
+    @GetMapping("/{id}")
+    public ResponseEntity<ApiResponse> getSingleSharedNote(@PathVariable Integer id) {
         GetSingleSharedNoteRequest request = new GetSingleSharedNoteRequest();
-        request.setSharedNoteId(sharedNoteId);
-        return getSingleSharedNoteService.execute(request);
+        request.setSharedNoteId(id);
+        ApiResponse response = getSingleSharedNoteService.execute(request);
+        return ResponseEntity.status(response.getResponseOutcome().getHttpStatus()).body(response);
     }
 
-    @PatchMapping("/editSharedNote")
-    public ApiResponse editSharedNote(@RequestBody EditShareNoteRequest request) {
-        return editSharedNoteService.execute(request);
+    @PatchMapping("/{id}")
+    public ResponseEntity<ApiResponse> editSharedNote(@PathVariable Integer id, @RequestBody EditShareNoteRequest request) {
+        request.setShareNoteId(id);
+        ApiResponse response = editSharedNoteService.execute(request);
+        return ResponseEntity.status(response.getResponseOutcome().getHttpStatus()).body(response);
     }
 
-    @GetMapping("/getAllSharedToUser")
-    public ApiResponse getSharedToUser(@RequestParam Integer noteId) {
+    @GetMapping("/note/{noteId}/users")
+    public ResponseEntity<ApiResponse> getSharedToUser(@PathVariable Integer noteId) {
         GetSharedToUsersRequest request = new GetSharedToUsersRequest();
         request.setId(noteId);
-        return getSharedToUsersService.execute(request);
+        ApiResponse response = getSharedToUsersService.execute(request);
+        return ResponseEntity.status(response.getResponseOutcome().getHttpStatus()).body(response);
     }
 
-    @DeleteMapping("/unshareUser")
-    public ApiResponse unshareNote(@RequestBody UnshareNoteRequest request) {
-        return unshareNoteService.execute(request);
+    @DeleteMapping("/note/{noteId}/user/{username}")
+    public ResponseEntity<ApiResponse> unshareNote(@PathVariable Integer noteId, @PathVariable String username) {
+        UnshareNoteRequest request = new UnshareNoteRequest();
+        request.setNoteId(noteId);
+        request.setSharedToUsername(username);
+        ApiResponse response = unshareNoteService.execute(request);
+        return ResponseEntity.status(response.getResponseOutcome().getHttpStatus()).body(response);
     }
 
-    @PatchMapping("/updatePermission")
-    public ApiResponse updatePermission(@RequestBody UpdateShareNotePermissionRequest request) {
-        return updateShareNotePermissionService.execute(request);
+    @PatchMapping("/note/{noteId}/user/{username}/permission")
+    public ResponseEntity<ApiResponse> updatePermission(@PathVariable Integer noteId, @PathVariable String username, @RequestBody UpdateShareNotePermissionRequest request) {
+        request.setNoteId(noteId);
+        request.setSharedToUsername(username);
+        ApiResponse response = updateShareNotePermissionService.execute(request);
+        return ResponseEntity.status(response.getResponseOutcome().getHttpStatus()).body(response);
     }
 
 }

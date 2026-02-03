@@ -29,9 +29,9 @@ public class SecurityConfig {
             .sessionManagement(session ->
                 session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth
-                .requestMatchers("/api/user/signup", "/api/user/login").permitAll()
-                .requestMatchers("/api/note/**", "/api/shared/**").authenticated()
-                .anyRequest().authenticated()
+                .requestMatchers("/api/users/signup", "/api/users/login").permitAll()
+                .requestMatchers("/api/notes/**", "/api/shares/**").authenticated()
+                .anyRequest().permitAll()
             )
             .exceptionHandling(ex -> ex
                 .authenticationEntryPoint((request, response, authException) -> {
