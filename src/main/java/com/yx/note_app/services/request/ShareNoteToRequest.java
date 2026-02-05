@@ -1,10 +1,17 @@
 package com.yx.note_app.services.request;
 
 import com.yx.note_app.enums.Permission;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 
 public class ShareNoteToRequest extends ApiRequest{
+    @NotNull(message = "Note ID is required")
     private Integer noteId;
+
+    @NotBlank(message = "Username to share with is required")
     private String sharedToUsername;
+
+    @NotNull(message = "Permission is required")
     private Permission permission;
 
     public Integer getNoteId() {

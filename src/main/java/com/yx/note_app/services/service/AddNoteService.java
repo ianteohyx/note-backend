@@ -5,32 +5,26 @@ import com.yx.note_app.repositories.NoteRepository;
 import com.yx.note_app.services.reponse.ApiResponse;
 import com.yx.note_app.services.reponse.ResponseDirectory;
 import com.yx.note_app.services.request.AddNoteRequest;
-import com.yx.note_app.utils.log.DefaultLogger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import java.util.Objects;
 
 @org.springframework.stereotype.Service
 public class AddNoteService extends Service<AddNoteRequest, ApiResponse>{
+
+    private static final Logger logger = LoggerFactory.getLogger(AddNoteService.class);
+
     @Autowired
     private NoteRepository noteRepository;
-
-    private final DefaultLogger logger = new DefaultLogger(this.getClass());
 
     @Override
     public ApiResponse doService(AddNoteRequest request) {
         noteRepository.save(buildNote(request));
-        logger.log(getUserUsingTheService().getUsername() + " added a note with title: " + request.getNoteTitle());
+        logger.info("User {} added a note with title: {}", getUserUsingTheService().getUsername(), request.getNoteTitle());
         return ResponseDirectory.buildSuccessResponse();
     }
 
-    @Override
-    public boolean paramCheck(AddNoteRequest request) {
-        return super.paramCheck(request)
-                && Objects.nonNull(request.getNoteTitle())
-                && Objects.nonNull(request.getNoteContent());
-    }
-
-    public Note buildNote(AddNoteRequest request){
+    private Note buildNote(AddNoteRequest request){
         Note newNote = new Note();
         newNote.setTitle(request.getNoteTitle());
         newNote.setContent(request.getNoteContent());

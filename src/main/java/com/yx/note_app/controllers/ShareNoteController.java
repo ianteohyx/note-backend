@@ -3,6 +3,7 @@ package com.yx.note_app.controllers;
 import com.yx.note_app.services.reponse.ApiResponse;
 import com.yx.note_app.services.request.*;
 import com.yx.note_app.services.service.*;
+import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -34,7 +35,7 @@ public class ShareNoteController {
     UpdateShareNotePermissionService updateShareNotePermissionService;
 
     @PostMapping
-    public ResponseEntity<ApiResponse> shareToOther(@RequestBody ShareNoteToRequest shareNoteToRequest) {
+    public ResponseEntity<ApiResponse> shareToOther(@Valid @RequestBody ShareNoteToRequest shareNoteToRequest) {
         ApiResponse response = shareNoteToOthersService.execute(shareNoteToRequest);
         HttpStatus status = response.getResponseOutcome().getSuccess()
             ? HttpStatus.CREATED
@@ -57,7 +58,7 @@ public class ShareNoteController {
     }
 
     @PatchMapping("/{id}")
-    public ResponseEntity<ApiResponse> editSharedNote(@PathVariable Integer id, @RequestBody EditShareNoteRequest request) {
+    public ResponseEntity<ApiResponse> editSharedNote(@PathVariable Integer id, @Valid @RequestBody EditShareNoteRequest request) {
         request.setShareNoteId(id);
         ApiResponse response = editSharedNoteService.execute(request);
         return ResponseEntity.status(response.getResponseOutcome().getHttpStatus()).body(response);
@@ -81,7 +82,7 @@ public class ShareNoteController {
     }
 
     @PatchMapping("/note/{noteId}/user/{username}/permission")
-    public ResponseEntity<ApiResponse> updatePermission(@PathVariable Integer noteId, @PathVariable String username, @RequestBody UpdateShareNotePermissionRequest request) {
+    public ResponseEntity<ApiResponse> updatePermission(@PathVariable Integer noteId, @PathVariable String username, @Valid @RequestBody UpdateShareNotePermissionRequest request) {
         request.setNoteId(noteId);
         request.setSharedToUsername(username);
         ApiResponse response = updateShareNotePermissionService.execute(request);

@@ -1,10 +1,16 @@
 package com.yx.note_app.services.request;
 
-import com.yx.note_app.dto.NoteDto;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
 
 public class UpdateNoteRequest extends ApiRequest{
+    @NotNull(message = "Note ID is required")
     private Integer noteId;
+
+    @Size(max = 255, message = "Note title must not exceed 255 characters")
     private String noteTitle;
+
+    @Size(max = 65535, message = "Note content must not exceed 65535 characters")
     private String noteContent;
 
     public Integer getNoteId() {

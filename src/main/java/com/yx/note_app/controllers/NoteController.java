@@ -3,6 +3,7 @@ package com.yx.note_app.controllers;
 import com.yx.note_app.services.request.*;
 import com.yx.note_app.services.service.*;
 import com.yx.note_app.services.reponse.ApiResponse;
+import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -27,7 +28,7 @@ public class NoteController {
     private DeleteNoteService deleteNoteService;
 
     @PostMapping
-    public ResponseEntity<ApiResponse> createNote(@RequestBody AddNoteRequest addNoteRequest) {
+    public ResponseEntity<ApiResponse> createNote(@Valid @RequestBody AddNoteRequest addNoteRequest) {
         ApiResponse response = addNoteService.execute(addNoteRequest);
         HttpStatus status = response.getResponseOutcome().getSuccess()
             ? HttpStatus.CREATED
@@ -50,7 +51,7 @@ public class NoteController {
     }
 
     @PatchMapping("/{id}")
-    public ResponseEntity<ApiResponse> updateNoteById(@PathVariable Integer id, @RequestBody UpdateNoteRequest updateNoteRequest) {
+    public ResponseEntity<ApiResponse> updateNoteById(@PathVariable Integer id, @Valid @RequestBody UpdateNoteRequest updateNoteRequest) {
         updateNoteRequest.setNoteId(id);
         ApiResponse response = updateNoteService.execute(updateNoteRequest);
         return ResponseEntity.status(response.getResponseOutcome().getHttpStatus()).body(response);

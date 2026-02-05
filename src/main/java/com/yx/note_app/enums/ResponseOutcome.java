@@ -14,7 +14,9 @@ public enum ResponseOutcome {
     NOTE_NOT_EXIST(false, "NOTE_NOT_EXIST", "note does not exist", HttpStatus.NOT_FOUND),
     NOTE_NOT_SHARED(false, "NOTE_NOT_SHARED", "note is note shared to this user", HttpStatus.FORBIDDEN),
     ACTION_NOT_ALLOWED(false, "ACTION_NOT_ALLOWED", "this action is not allowed", HttpStatus.FORBIDDEN),
-    NOTE_ALREADY_SHARED(false, "NOTE_ALREADY_SHARED", "this note already shared to the same user", HttpStatus.CONFLICT);
+    NOTE_ALREADY_SHARED(false, "NOTE_ALREADY_SHARED", "this note already shared to the same user", HttpStatus.CONFLICT),
+    VALIDATION_ERROR(false, "VALIDATION_ERROR", "request validation failed", HttpStatus.BAD_REQUEST),
+    RATE_LIMIT_EXCEEDED(false, "RATE_LIMIT_EXCEEDED", "too many requests, please try again later", HttpStatus.TOO_MANY_REQUESTS);
 
     private final boolean success;
     private final String code;
