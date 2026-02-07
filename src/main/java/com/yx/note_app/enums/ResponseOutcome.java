@@ -16,7 +16,8 @@ public enum ResponseOutcome {
     ACTION_NOT_ALLOWED(false, "ACTION_NOT_ALLOWED", "this action is not allowed", HttpStatus.FORBIDDEN),
     NOTE_ALREADY_SHARED(false, "NOTE_ALREADY_SHARED", "this note already shared to the same user", HttpStatus.CONFLICT),
     VALIDATION_ERROR(false, "VALIDATION_ERROR", "request validation failed", HttpStatus.BAD_REQUEST),
-    RATE_LIMIT_EXCEEDED(false, "RATE_LIMIT_EXCEEDED", "too many requests, please try again later", HttpStatus.TOO_MANY_REQUESTS);
+    RATE_LIMIT_EXCEEDED(false, "RATE_LIMIT_EXCEEDED", "too many requests, please try again later", HttpStatus.TOO_MANY_REQUESTS),
+    REFRESH_TOKEN_INVALID(false, "REFRESH_TOKEN_INVALID", "refresh token is invalid or expired", HttpStatus.UNAUTHORIZED);
 
     private final boolean success;
     private final String code;

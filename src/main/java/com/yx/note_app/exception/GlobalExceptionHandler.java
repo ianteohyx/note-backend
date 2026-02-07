@@ -59,6 +59,14 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(ex.getResponseOutcome().getHttpStatus()).body(response);
     }
 
+    @ExceptionHandler(InvalidRefreshTokenException.class)
+    public ResponseEntity<ApiResponse> handleInvalidRefreshTokenException(InvalidRefreshTokenException ex) {
+        logger.warn("Invalid refresh token: {}", ex.getMessage());
+
+        ErrorResponse response = new ErrorResponse(ex.getResponseOutcome(), ex.getMessage());
+        return ResponseEntity.status(ex.getResponseOutcome().getHttpStatus()).body(response);
+    }
+
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ApiResponse> handleValidationExceptions(MethodArgumentNotValidException ex) {
         Map<String, String> fieldErrors = new HashMap<>();

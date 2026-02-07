@@ -2,8 +2,10 @@ package com.yx.note_app.services.service;
 
 import com.yx.note_app.enums.ResponseOutcome;
 import com.yx.note_app.exception.InvalidCredentialsException;
+import com.yx.note_app.models.RefreshToken;
 import com.yx.note_app.models.User;
 import com.yx.note_app.repositories.UserRepository;
+import com.yx.note_app.security.RefreshTokenService;
 import com.yx.note_app.services.reponse.ApiResponse;
 import com.yx.note_app.services.reponse.LoginResponse;
 import com.yx.note_app.services.request.LoginRequest;
@@ -29,23 +31,30 @@ public class LogInService extends Service<LoginRequest, ApiResponse>{
     @Autowired
     private PasswordEncoder passwordEncoder;
 
+    @Autowired
+    private RefreshTokenService refreshTokenService;
+
     @Override
     public ApiResponse doService(LoginRequest request) {
         Optional<User> actualUser = userRepository.findByUsername(request.getUsername());
 
         if (actualUser.isPresent() && passwordEncoder.matches(request.getPassword(), actualUser.get().getPassword())) {
             logger.info("Login successful for user: {}", request.getUsername());
-            return buildSuccessLoginResponse(jwtUtils.generateToken(actualUser.get()));
+            User user = actualUser.get();
+            String jwt = jwtUtils.generateToken(user);
+            RefreshToken refreshToken = refreshTokenService.createRefreshToken(user);
+            return buildSuccessLoginResponse(jwt, refreshToken.getToken());
         }
 
         logger.warn("Login failed for user: {}", request.getUsername());
         throw InvalidCredentialsException.loginFailed();
     }
 
-    private LoginResponse buildSuccessLoginResponse(String token){
+    private LoginResponse buildSuccessLoginResponse(String token, String refreshToken){
         LoginResponse loginResponse = new LoginResponse();
         loginResponse.setResponseOutcome(ResponseOutcome.SUCCESS);
         loginResponse.setToken(token);
+        loginResponse.setRefreshToken(refreshToken);
         return loginResponse;
     }
 }

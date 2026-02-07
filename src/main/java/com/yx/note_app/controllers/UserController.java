@@ -1,9 +1,11 @@
 package com.yx.note_app.controllers;
 
 import com.yx.note_app.services.service.LogInService;
+import com.yx.note_app.services.service.RefreshTokenRequestService;
 import com.yx.note_app.services.service.SignUpService;
 import com.yx.note_app.services.reponse.ApiResponse;
 import com.yx.note_app.services.request.LoginRequest;
+import com.yx.note_app.services.request.RefreshTokenRequest;
 import com.yx.note_app.services.request.SignUpRequest;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -21,6 +23,9 @@ public class UserController {
     @Autowired
     private LogInService logInService;
 
+    @Autowired
+    private RefreshTokenRequestService refreshTokenRequestService;
+
     @PostMapping("/signup")
     public ResponseEntity<ApiResponse> createUser(@Valid @RequestBody SignUpRequest signUpRequest) {
         ApiResponse response = signUpService.execute(signUpRequest);
@@ -33,6 +38,12 @@ public class UserController {
     @PostMapping("/login")
     public ResponseEntity<ApiResponse> verifyUser(@Valid @RequestBody LoginRequest loginRequest) {
         ApiResponse response = logInService.execute(loginRequest);
+        return ResponseEntity.status(response.getResponseOutcome().getHttpStatus()).body(response);
+    }
+
+    @PostMapping("/refresh")
+    public ResponseEntity<ApiResponse> refreshToken(@Valid @RequestBody RefreshTokenRequest refreshTokenRequest) {
+        ApiResponse response = refreshTokenRequestService.execute(refreshTokenRequest);
         return ResponseEntity.status(response.getResponseOutcome().getHttpStatus()).body(response);
     }
 }

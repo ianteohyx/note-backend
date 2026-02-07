@@ -33,7 +33,7 @@ public class RateLimitingFilter extends OncePerRequestFilter {
     protected boolean shouldNotFilter(HttpServletRequest request) {
         String path = request.getServletPath();
         // Only apply rate limiting to auth endpoints
-        return !path.equals("/api/users/signup") && !path.equals("/api/users/login");
+        return !path.equals("/api/users/signup") && !path.equals("/api/users/login") && !path.equals("/api/users/refresh");
     }
 
     @Override
