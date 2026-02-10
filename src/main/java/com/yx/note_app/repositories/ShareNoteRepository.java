@@ -13,11 +13,13 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
 
 public interface ShareNoteRepository extends JpaRepository<SharedNote, Integer>{
-    // Find all notes shared to a specific user
-    List<SharedNote> findBySharedToUser(User user);
+    // Find all notes shared to a specific user (JOIN FETCH to avoid N+1)
+    @Query("SELECT sn FROM SharedNote sn JOIN FETCH sn.note n JOIN FETCH n.author JOIN FETCH sn.sharedToUser WHERE sn.sharedToUser = :user")
+    List<SharedNote> findBySharedToUser(@Param("user") User user);
 
-    // Find a specific shared note
-    SharedNote findById(int id);
+    // Find a specific shared note (JOIN FETCH to avoid N+1)
+    @Query("SELECT sn FROM SharedNote sn JOIN FETCH sn.note n JOIN FETCH n.author JOIN FETCH sn.sharedToUser WHERE sn.id = :id")
+    SharedNote findById(@Param("id") int id);
 
     // Find a specific shared note base on user & note
     SharedNote findByNoteIdAndSharedToUserId(int noteId, int sharedToUserId);

@@ -10,11 +10,17 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
 
 public interface NoteRepository extends JpaRepository<Note, Integer>{
-    // Find all notes by author
-    List<Note> findByAuthor(User author);
+    // Find all notes by author (JOIN FETCH author to avoid N+1)
+    @Query("SELECT n FROM Note n JOIN FETCH n.author WHERE n.author = :author")
+    List<Note> findByAuthor(@Param("author") User author);
 
-    // Find notes by id
-    Note findById(int id);
+    // Find note by id (JOIN FETCH author to avoid N+1)
+    @Query("SELECT n FROM Note n JOIN FETCH n.author WHERE n.id = :id")
+    Note findById(@Param("id") int id);
+
+    // Find note by id with shared notes and their users (for GetSharedToUsersService)
+    @Query("SELECT n FROM Note n JOIN FETCH n.author LEFT JOIN FETCH n.sharedNotes sn LEFT JOIN FETCH sn.sharedToUser WHERE n.id = :id")
+    Note findByIdWithSharedUsers(@Param("id") int id);
 
     //Delete notes by id
     void deleteById(int id);

@@ -9,11 +9,11 @@ import com.yx.note_app.enums.Permission;
         uniqueConstraints = @UniqueConstraint(columnNames = {"note_id", "shared_to_user_id"})
 )
 public class SharedNote extends Model{
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "note_id")
     private Note note;
 
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "shared_to_user_id")
     private User sharedToUser;
 

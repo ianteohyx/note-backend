@@ -28,7 +28,7 @@ public class GetSharedToUsersService extends Service<GetSharedToUsersRequest, Ap
 
     @Override
     public ApiResponse doService(GetSharedToUsersRequest request) {
-        Note note = noteRepository.findById((int)request.getNoteId());
+        Note note = noteRepository.findByIdWithSharedUsers((int)request.getNoteId());
 
         if (Objects.isNull(note)){
             throw ResourceNotFoundException.noteNotFound(request.getNoteId());
