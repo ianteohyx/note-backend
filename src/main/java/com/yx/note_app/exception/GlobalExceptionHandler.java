@@ -19,38 +19,6 @@ public class GlobalExceptionHandler {
 
     private static final Logger logger = LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
-    @ExceptionHandler(ApiException.class)
-    public ResponseEntity<ApiResponse> handleApiException(ApiException ex) {
-        logger.warn("API exception: {} - {}", ex.getResponseOutcome().getCode(), ex.getMessage());
-
-        ErrorResponse response = new ErrorResponse(ex.getResponseOutcome(), ex.getMessage());
-        return ResponseEntity.status(ex.getResponseOutcome().getHttpStatus()).body(response);
-    }
-
-    @ExceptionHandler(ResourceNotFoundException.class)
-    public ResponseEntity<ApiResponse> handleResourceNotFoundException(ResourceNotFoundException ex) {
-        logger.warn("Resource not found: {}", ex.getMessage());
-
-        ErrorResponse response = new ErrorResponse(ex.getResponseOutcome(), ex.getMessage());
-        return ResponseEntity.status(ex.getResponseOutcome().getHttpStatus()).body(response);
-    }
-
-    @ExceptionHandler(UnauthorizedException.class)
-    public ResponseEntity<ApiResponse> handleUnauthorizedException(UnauthorizedException ex) {
-        logger.warn("Unauthorized action: {}", ex.getMessage());
-
-        ErrorResponse response = new ErrorResponse(ex.getResponseOutcome(), ex.getMessage());
-        return ResponseEntity.status(ex.getResponseOutcome().getHttpStatus()).body(response);
-    }
-
-    @ExceptionHandler(DuplicateResourceException.class)
-    public ResponseEntity<ApiResponse> handleDuplicateResourceException(DuplicateResourceException ex) {
-        logger.warn("Duplicate resource: {}", ex.getMessage());
-
-        ErrorResponse response = new ErrorResponse(ex.getResponseOutcome(), ex.getMessage());
-        return ResponseEntity.status(ex.getResponseOutcome().getHttpStatus()).body(response);
-    }
-
     @ExceptionHandler(InvalidCredentialsException.class)
     public ResponseEntity<ApiResponse> handleInvalidCredentialsException(InvalidCredentialsException ex) {
         logger.warn("Invalid credentials attempt");
@@ -59,9 +27,9 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(ex.getResponseOutcome().getHttpStatus()).body(response);
     }
 
-    @ExceptionHandler(InvalidRefreshTokenException.class)
-    public ResponseEntity<ApiResponse> handleInvalidRefreshTokenException(InvalidRefreshTokenException ex) {
-        logger.warn("Invalid refresh token: {}", ex.getMessage());
+    @ExceptionHandler(ApiException.class)
+    public ResponseEntity<ApiResponse> handleApiException(ApiException ex) {
+        logger.warn("API exception: {} - {}", ex.getResponseOutcome().getCode(), ex.getMessage());
 
         ErrorResponse response = new ErrorResponse(ex.getResponseOutcome(), ex.getMessage());
         return ResponseEntity.status(ex.getResponseOutcome().getHttpStatus()).body(response);
