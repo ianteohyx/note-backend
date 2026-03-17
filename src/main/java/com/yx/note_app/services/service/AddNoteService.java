@@ -20,7 +20,7 @@ public class AddNoteService extends Service<AddNoteRequest, ApiResponse>{
     @Override
     public ApiResponse doService(AddNoteRequest request) {
         noteRepository.save(buildNote(request));
-        logger.info("User {} added a note with title: {}", getUserUsingTheService().getUsername(), request.getNoteTitle());
+        logger.info("Note added successfully");
         return ResponseDirectory.buildSuccessResponse();
     }
 

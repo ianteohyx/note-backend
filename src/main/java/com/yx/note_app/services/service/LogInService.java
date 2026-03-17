@@ -39,14 +39,14 @@ public class LogInService extends Service<LoginRequest, ApiResponse>{
         Optional<User> actualUser = userRepository.findByUsername(request.getUsername());
 
         if (actualUser.isPresent() && passwordEncoder.matches(request.getPassword(), actualUser.get().getPassword())) {
-            logger.info("Login successful for user: {}", request.getUsername());
+            logger.info("Login successful");
             User user = actualUser.get();
             String jwt = jwtUtils.generateToken(user);
             RefreshToken refreshToken = refreshTokenService.createRefreshToken(user);
             return buildSuccessLoginResponse(jwt, refreshToken.getToken());
         }
 
-        logger.warn("Login failed for user: {}", request.getUsername());
+        logger.warn("Login attempt failed - invalid credentials");
         throw InvalidCredentialsException.loginFailed();
     }
 
