@@ -3,6 +3,7 @@ package com.yx.note_app.controllers;
 import com.yx.note_app.config.OpenApiConfig;
 import com.yx.note_app.services.request.*;
 import com.yx.note_app.services.service.*;
+import com.yx.note_app.services.request.GetAllNotesRequest;
 import com.yx.note_app.services.reponse.*;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -55,16 +56,21 @@ public class NoteController {
         return ResponseEntity.status(status).body(response);
     }
 
-    @Operation(summary = "Get all notes belonging to the authenticated user")
+    @Operation(summary = "Get all notes belonging to the authenticated user (paginated)")
     @ApiResponses({
-        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "List of notes",
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Paginated list of notes",
             content = @Content(schema = @Schema(implementation = GetAllNoteResponse.class))),
         @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "Unauthorized",
             content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
     })
     @GetMapping
-    public ResponseEntity<ApiResponse> getAllNotes() {
-        ApiResponse response = getAllNotesService.execute(new ApiRequest());
+    public ResponseEntity<ApiResponse> getAllNotes(
+            @Parameter(description = "Page number (0-indexed)", example = "0") @RequestParam(defaultValue = "0") int page,
+            @Parameter(description = "Number of notes per page", example = "10") @RequestParam(defaultValue = "10") int size) {
+        GetAllNotesRequest request = new GetAllNotesRequest();
+        request.setPage(page);
+        request.setSize(size);
+        ApiResponse response = getAllNotesService.execute(request);
         return ResponseEntity.status(response.getResponseOutcome().getHttpStatus()).body(response);
     }
 

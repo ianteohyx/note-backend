@@ -3,6 +3,7 @@ package com.yx.note_app.controllers;
 import com.yx.note_app.config.OpenApiConfig;
 import com.yx.note_app.services.reponse.*;
 import com.yx.note_app.services.request.*;
+import com.yx.note_app.services.request.GetAllSharedToMeRequest;
 import com.yx.note_app.services.service.*;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -64,16 +65,21 @@ public class ShareNoteController {
         return ResponseEntity.status(status).body(response);
     }
 
-    @Operation(summary = "Get all notes shared to the authenticated user")
+    @Operation(summary = "Get all notes shared to the authenticated user (paginated)")
     @ApiResponses({
-        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "List of shared notes",
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Paginated list of shared notes",
             content = @Content(schema = @Schema(implementation = GetAllSharedToMeResponse.class))),
         @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "Unauthorized",
             content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
     })
     @GetMapping("/received")
-    public ResponseEntity<ApiResponse> getAllSharedToMe() {
-        ApiResponse response = getAllSharedToMeService.execute(new ApiRequest());
+    public ResponseEntity<ApiResponse> getAllSharedToMe(
+            @Parameter(description = "Page number (0-indexed)", example = "0") @RequestParam(defaultValue = "0") int page,
+            @Parameter(description = "Number of shared notes per page", example = "10") @RequestParam(defaultValue = "10") int size) {
+        GetAllSharedToMeRequest request = new GetAllSharedToMeRequest();
+        request.setPage(page);
+        request.setSize(size);
+        ApiResponse response = getAllSharedToMeService.execute(request);
         return ResponseEntity.status(response.getResponseOutcome().getHttpStatus()).body(response);
     }
 
