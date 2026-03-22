@@ -16,8 +16,8 @@ public interface NoteRepository extends JpaRepository<Note, Integer>{
     @Query("SELECT n FROM Note n JOIN FETCH n.author WHERE n.author = :author")
     List<Note> findByAuthor(@Param("author") User author);
 
-    // Find all notes by author with pagination
-    @Query(value = "SELECT n FROM Note n WHERE n.author = :author",
+    // Find all notes by author with pagination (JOIN FETCH author to avoid N+1)
+    @Query(value = "SELECT n FROM Note n JOIN FETCH n.author WHERE n.author = :author",
            countQuery = "SELECT COUNT(n) FROM Note n WHERE n.author = :author")
     Page<Note> findByAuthor(@Param("author") User author, Pageable pageable);
 

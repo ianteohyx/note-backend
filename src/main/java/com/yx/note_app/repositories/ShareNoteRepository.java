@@ -19,8 +19,8 @@ public interface ShareNoteRepository extends JpaRepository<SharedNote, Integer>{
     @Query("SELECT sn FROM SharedNote sn JOIN FETCH sn.note n JOIN FETCH n.author JOIN FETCH sn.sharedToUser WHERE sn.sharedToUser = :user")
     List<SharedNote> findBySharedToUser(@Param("user") User user);
 
-    // Find all notes shared to a specific user with pagination
-    @Query(value = "SELECT sn FROM SharedNote sn WHERE sn.sharedToUser = :user",
+    // Find all notes shared to a specific user with pagination (JOIN FETCH to avoid N+1)
+    @Query(value = "SELECT sn FROM SharedNote sn JOIN FETCH sn.note n JOIN FETCH n.author JOIN FETCH sn.sharedToUser WHERE sn.sharedToUser = :user",
            countQuery = "SELECT COUNT(sn) FROM SharedNote sn WHERE sn.sharedToUser = :user")
     Page<SharedNote> findBySharedToUser(@Param("user") User user, Pageable pageable);
 
