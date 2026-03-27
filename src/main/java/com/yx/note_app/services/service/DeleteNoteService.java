@@ -10,6 +10,7 @@ import com.yx.note_app.services.request.DeleteNoteRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Objects;
 
@@ -22,6 +23,7 @@ public class DeleteNoteService extends Service<DeleteNoteRequest, ApiResponse> {
     private NoteRepository noteRepository;
 
     @Override
+    @Transactional
     public ApiResponse doService(DeleteNoteRequest request) {
         int id = request.getNoteId();
         Note note = noteRepository.findById(id);

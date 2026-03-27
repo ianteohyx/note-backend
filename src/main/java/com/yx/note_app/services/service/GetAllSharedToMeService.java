@@ -11,6 +11,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 
@@ -25,6 +26,7 @@ public class GetAllSharedToMeService extends Service<GetAllSharedToMeRequest, Ge
     private ShareNoteRepository shareNoteRepository;
 
     @Override
+    @Transactional(readOnly = true)
     public GetAllSharedToMeResponse doService(GetAllSharedToMeRequest request) {
         PageRequest pageable = PageRequest.of(request.getPage(), request.getSize(), Sort.by("id").descending());
         Page<SharedNote> sharedNotePage = shareNoteRepository.findBySharedToUser(getUserUsingTheService(), pageable);

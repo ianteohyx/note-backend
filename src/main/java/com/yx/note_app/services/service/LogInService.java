@@ -14,6 +14,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Optional;
 
@@ -35,6 +36,7 @@ public class LogInService extends Service<LoginRequest, ApiResponse>{
     private RefreshTokenService refreshTokenService;
 
     @Override
+    @Transactional
     public ApiResponse doService(LoginRequest request) {
         Optional<User> actualUser = userRepository.findByUsername(request.getUsername());
 

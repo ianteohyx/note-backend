@@ -10,6 +10,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.transaction.annotation.Transactional;
 
 @org.springframework.stereotype.Service
 public class SignUpService extends Service<SignUpRequest, ApiResponse>{
@@ -23,6 +24,7 @@ public class SignUpService extends Service<SignUpRequest, ApiResponse>{
     private PasswordEncoder passwordEncoder;
 
     @Override
+    @Transactional
     public ApiResponse doService(SignUpRequest request) {
         if (userRepository.existsByUsername(request.getUsername())){
             throw DuplicateResourceException.usernameExists(request.getUsername());

@@ -8,6 +8,7 @@ import com.yx.note_app.services.request.AddNoteRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.transaction.annotation.Transactional;
 
 @org.springframework.stereotype.Service
 public class AddNoteService extends Service<AddNoteRequest, ApiResponse>{
@@ -18,6 +19,7 @@ public class AddNoteService extends Service<AddNoteRequest, ApiResponse>{
     private NoteRepository noteRepository;
 
     @Override
+    @Transactional
     public ApiResponse doService(AddNoteRequest request) {
         noteRepository.save(buildNote(request));
         logger.info("Note added successfully");

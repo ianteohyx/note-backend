@@ -16,6 +16,7 @@ import com.yx.note_app.services.request.ShareNoteToRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Objects;
 import java.util.Optional;
@@ -35,6 +36,7 @@ public class ShareNoteToOthersService extends Service<ShareNoteToRequest, ApiRes
     private ShareNoteRepository shareNoteRepository;
 
     @Override
+    @Transactional
     public ApiResponse doService(ShareNoteToRequest request) {
         int id = request.getNoteId();
         Note note = noteRepository.findById(id);

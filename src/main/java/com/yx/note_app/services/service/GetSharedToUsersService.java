@@ -12,6 +12,7 @@ import com.yx.note_app.services.request.GetSharedToUsersRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -27,6 +28,7 @@ public class GetSharedToUsersService extends Service<GetSharedToUsersRequest, Ap
     private NoteRepository noteRepository;
 
     @Override
+    @Transactional(readOnly = true)
     public ApiResponse doService(GetSharedToUsersRequest request) {
         Note note = noteRepository.findByIdWithSharedUsers((int)request.getNoteId());
 

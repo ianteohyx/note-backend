@@ -13,6 +13,7 @@ import com.yx.note_app.utils.mapper.SharedNote2SharedNoteDto;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Objects;
 
@@ -25,6 +26,7 @@ public class GetSingleSharedNoteService extends Service<GetSingleSharedNoteReque
     private ShareNoteRepository shareNoteRepository;
 
     @Override
+    @Transactional(readOnly = true)
     public ApiResponse doService(GetSingleSharedNoteRequest request) {
         int sharedNoteId = request.getSharedNoteId();
         SharedNote sharedNote = shareNoteRepository.findById(sharedNoteId);

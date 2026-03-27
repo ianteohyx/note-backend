@@ -11,6 +11,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 
@@ -25,6 +26,7 @@ public class GetAllNotesService extends Service<GetAllNotesRequest, GetAllNoteRe
     private NoteRepository noteRepository;
 
     @Override
+    @Transactional(readOnly = true)
     public GetAllNoteResponse doService(GetAllNotesRequest request) {
         PageRequest pageable = PageRequest.of(request.getPage(), request.getSize(), Sort.by("dateModified").descending());
         Page<Note> notePage = noteRepository.findByAuthor(getUserUsingTheService(), pageable);

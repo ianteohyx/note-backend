@@ -14,6 +14,7 @@ import com.yx.note_app.services.request.UnshareNoteRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Objects;
 import java.util.Optional;
@@ -33,6 +34,7 @@ public class UnshareNoteService extends Service<UnshareNoteRequest, ApiResponse>
     private ShareNoteRepository shareNoteRepository;
 
     @Override
+    @Transactional
     public ApiResponse doService(UnshareNoteRequest request) {
         Optional<User> user = userRepository.findByUsername(request.getSharedToUsername());
 

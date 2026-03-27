@@ -14,6 +14,7 @@ import com.yx.note_app.services.request.UpdateShareNotePermissionRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Objects;
 import java.util.Optional;
@@ -33,6 +34,7 @@ public class UpdateShareNotePermissionService extends Service<UpdateShareNotePer
     private ShareNoteRepository shareNoteRepository;
 
     @Override
+    @Transactional
     public ApiResponse doService(UpdateShareNotePermissionRequest request) {
         Optional<User> user = userRepository.findByUsername(request.getSharedToUsername());
 
