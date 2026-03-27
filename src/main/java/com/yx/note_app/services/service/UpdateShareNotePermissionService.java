@@ -1,7 +1,6 @@
 package com.yx.note_app.services.service;
 
 import com.yx.note_app.exception.ResourceNotFoundException;
-import com.yx.note_app.exception.UnauthorizedException;
 import com.yx.note_app.models.Note;
 import com.yx.note_app.models.SharedNote;
 import com.yx.note_app.models.User;
@@ -47,9 +46,7 @@ public class UpdateShareNotePermissionService extends Service<UpdateShareNotePer
             throw ResourceNotFoundException.noteNotFound(request.getNoteId());
         }
 
-        if (!note.getAuthor().equals(getUserUsingTheService())){
-            throw UnauthorizedException.notOwner(getUserUsingTheService().getUsername());
-        }
+        assertIsOwner(note);
 
         SharedNote sharedNote = shareNoteRepository.findByNoteIdAndSharedToUserId(note.getId(), user.get().getId());
 

@@ -3,10 +3,8 @@ package com.yx.note_app.services.service;
 import com.yx.note_app.dto.SharedNoteDto;
 import com.yx.note_app.enums.ResponseOutcome;
 import com.yx.note_app.exception.ResourceNotFoundException;
-import com.yx.note_app.exception.UnauthorizedException;
 import com.yx.note_app.models.SharedNote;
 import com.yx.note_app.repositories.ShareNoteRepository;
-import com.yx.note_app.services.reponse.ApiResponse;
 import com.yx.note_app.services.reponse.GetSingleSharedNoteResponse;
 import com.yx.note_app.services.request.GetSingleSharedNoteRequest;
 import com.yx.note_app.utils.mapper.SharedNote2SharedNoteDto;
@@ -18,7 +16,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.Objects;
 
 @org.springframework.stereotype.Service
-public class GetSingleSharedNoteService extends Service<GetSingleSharedNoteRequest, ApiResponse>{
+public class GetSingleSharedNoteService extends Service<GetSingleSharedNoteRequest, GetSingleSharedNoteResponse>{
 
     private static final Logger logger = LoggerFactory.getLogger(GetSingleSharedNoteService.class);
 
@@ -27,7 +25,7 @@ public class GetSingleSharedNoteService extends Service<GetSingleSharedNoteReque
 
     @Override
     @Transactional(readOnly = true)
-    public ApiResponse doService(GetSingleSharedNoteRequest request) {
+    public GetSingleSharedNoteResponse doService(GetSingleSharedNoteRequest request) {
         int sharedNoteId = request.getSharedNoteId();
         SharedNote sharedNote = shareNoteRepository.findById(sharedNoteId);
 
@@ -35,9 +33,7 @@ public class GetSingleSharedNoteService extends Service<GetSingleSharedNoteReque
             throw ResourceNotFoundException.sharedNoteNotFound(sharedNoteId);
         }
 
-        if (!sharedNote.getSharedToUser().equals(getUserUsingTheService())){
-            throw UnauthorizedException.notOwner(getUserUsingTheService().getUsername());
-        }
+        assertIsRecipient(sharedNote);
 
         logger.info("User {} retrieved shared note id: {}", getUserUsingTheService().getUsername(), sharedNoteId);
         return buildSuccessGetSingleSharedNote(sharedNote);

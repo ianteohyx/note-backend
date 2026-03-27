@@ -3,7 +3,6 @@ package com.yx.note_app.services.service;
 import com.yx.note_app.enums.Permission;
 import com.yx.note_app.exception.DuplicateResourceException;
 import com.yx.note_app.exception.ResourceNotFoundException;
-import com.yx.note_app.exception.UnauthorizedException;
 import com.yx.note_app.models.Note;
 import com.yx.note_app.models.SharedNote;
 import com.yx.note_app.models.User;
@@ -45,9 +44,7 @@ public class ShareNoteToOthersService extends Service<ShareNoteToRequest, ApiRes
             throw ResourceNotFoundException.noteNotFound(id);
         }
 
-        if (!note.getAuthor().equals(getUserUsingTheService())){
-            throw UnauthorizedException.notOwner(getUserUsingTheService().getUsername());
-        }
+        assertIsOwner(note);
 
         Optional<User> shareToUser = userRepository.findByUsername(request.getSharedToUsername());
         if (shareToUser.isEmpty() || shareToUser.get().equals(getUserUsingTheService())){

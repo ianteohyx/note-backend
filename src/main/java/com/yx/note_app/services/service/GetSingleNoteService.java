@@ -2,10 +2,8 @@ package com.yx.note_app.services.service;
 
 import com.yx.note_app.enums.ResponseOutcome;
 import com.yx.note_app.exception.ResourceNotFoundException;
-import com.yx.note_app.exception.UnauthorizedException;
 import com.yx.note_app.models.Note;
 import com.yx.note_app.repositories.NoteRepository;
-import com.yx.note_app.services.reponse.ApiResponse;
 import com.yx.note_app.services.reponse.GetSingleNoteResponse;
 import com.yx.note_app.services.request.GetSingleNoteRequest;
 import com.yx.note_app.utils.mapper.Note2NoteDto;
@@ -17,7 +15,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.Objects;
 
 @org.springframework.stereotype.Service
-public class GetSingleNoteService extends Service<GetSingleNoteRequest, ApiResponse>{
+public class GetSingleNoteService extends Service<GetSingleNoteRequest, GetSingleNoteResponse>{
 
     private static final Logger logger = LoggerFactory.getLogger(GetSingleNoteService.class);
 
@@ -26,7 +24,7 @@ public class GetSingleNoteService extends Service<GetSingleNoteRequest, ApiRespo
 
     @Override
     @Transactional(readOnly = true)
-    public ApiResponse doService(GetSingleNoteRequest request) {
+    public GetSingleNoteResponse doService(GetSingleNoteRequest request) {
         int id = request.getNoteId();
         Note note = noteRepository.findById(id);
 
@@ -34,9 +32,7 @@ public class GetSingleNoteService extends Service<GetSingleNoteRequest, ApiRespo
             throw ResourceNotFoundException.noteNotFound(id);
         }
 
-        if (!note.getAuthor().equals(getUserUsingTheService())){
-            throw UnauthorizedException.notOwner(getUserUsingTheService().getUsername());
-        }
+        assertIsOwner(note);
 
         logger.info("User {} retrieved note id: {}", getUserUsingTheService().getUsername(), id);
         return buildGetSingleNoteResponse(note);

@@ -64,13 +64,13 @@ public class NoteController {
             content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
     })
     @GetMapping
-    public ResponseEntity<ApiResponse> getAllNotes(
+    public ResponseEntity<GetAllNoteResponse> getAllNotes(
             @Parameter(description = "Page number (0-indexed)", example = "0") @RequestParam(defaultValue = "0") int page,
             @Parameter(description = "Number of notes per page", example = "10") @RequestParam(defaultValue = "10") int size) {
         GetAllNotesRequest request = new GetAllNotesRequest();
         request.setPage(page);
         request.setSize(size);
-        ApiResponse response = getAllNotesService.execute(request);
+        GetAllNoteResponse response = getAllNotesService.execute(request);
         return ResponseEntity.status(response.getResponseOutcome().getHttpStatus()).body(response);
     }
 
@@ -86,10 +86,10 @@ public class NoteController {
             content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
     })
     @GetMapping("/{id}")
-    public ResponseEntity<ApiResponse> getNoteById(@Parameter(description = "Note ID", example = "42") @PathVariable Integer id) {
+    public ResponseEntity<GetSingleNoteResponse> getNoteById(@Parameter(description = "Note ID", example = "42") @PathVariable Integer id) {
         GetSingleNoteRequest request = new GetSingleNoteRequest();
         request.setNoteId(id);
-        ApiResponse response = getSingleNoteService.execute(request);
+        GetSingleNoteResponse response = getSingleNoteService.execute(request);
         return ResponseEntity.status(response.getResponseOutcome().getHttpStatus()).body(response);
     }
 

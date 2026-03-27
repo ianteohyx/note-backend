@@ -2,11 +2,9 @@ package com.yx.note_app.services.service;
 
 import com.yx.note_app.enums.ResponseOutcome;
 import com.yx.note_app.exception.ResourceNotFoundException;
-import com.yx.note_app.exception.UnauthorizedException;
 import com.yx.note_app.models.Note;
 import com.yx.note_app.models.User;
 import com.yx.note_app.repositories.NoteRepository;
-import com.yx.note_app.services.reponse.ApiResponse;
 import com.yx.note_app.services.reponse.GetSharedToUsersResponse;
 import com.yx.note_app.services.request.GetSharedToUsersRequest;
 import org.slf4j.Logger;
@@ -20,7 +18,7 @@ import java.util.Objects;
 import java.util.Optional;
 
 @org.springframework.stereotype.Service
-public class GetSharedToUsersService extends Service<GetSharedToUsersRequest, ApiResponse> {
+public class GetSharedToUsersService extends Service<GetSharedToUsersRequest, GetSharedToUsersResponse> {
 
     private static final Logger logger = LoggerFactory.getLogger(GetSharedToUsersService.class);
 
@@ -29,16 +27,14 @@ public class GetSharedToUsersService extends Service<GetSharedToUsersRequest, Ap
 
     @Override
     @Transactional(readOnly = true)
-    public ApiResponse doService(GetSharedToUsersRequest request) {
+    public GetSharedToUsersResponse doService(GetSharedToUsersRequest request) {
         Note note = noteRepository.findByIdWithSharedUsers((int)request.getNoteId());
 
         if (Objects.isNull(note)){
             throw ResourceNotFoundException.noteNotFound(request.getNoteId());
         }
 
-        if (!note.getAuthor().equals(getUserUsingTheService())){
-            throw UnauthorizedException.notOwner(getUserUsingTheService().getUsername());
-        }
+        assertIsOwner(note);
 
         List<String> usernames = new ArrayList<>();
         note.getSharedNotes().forEach(sharedNote -> {

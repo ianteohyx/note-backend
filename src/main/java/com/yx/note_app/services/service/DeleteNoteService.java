@@ -1,7 +1,6 @@
 package com.yx.note_app.services.service;
 
 import com.yx.note_app.exception.ResourceNotFoundException;
-import com.yx.note_app.exception.UnauthorizedException;
 import com.yx.note_app.models.Note;
 import com.yx.note_app.repositories.NoteRepository;
 import com.yx.note_app.services.reponse.ApiResponse;
@@ -32,9 +31,7 @@ public class DeleteNoteService extends Service<DeleteNoteRequest, ApiResponse> {
             throw ResourceNotFoundException.noteNotFound(id);
         }
 
-        if (!note.getAuthor().equals(getUserUsingTheService())){
-            throw UnauthorizedException.notOwner(getUserUsingTheService().getUsername());
-        }
+        assertIsOwner(note);
 
         noteRepository.deleteById(id);
         logger.info("Deleted note id: {}", id);

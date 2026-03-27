@@ -6,7 +6,6 @@ import com.yx.note_app.models.RefreshToken;
 import com.yx.note_app.models.User;
 import com.yx.note_app.repositories.UserRepository;
 import com.yx.note_app.security.RefreshTokenService;
-import com.yx.note_app.services.reponse.ApiResponse;
 import com.yx.note_app.services.reponse.LoginResponse;
 import com.yx.note_app.services.request.LoginRequest;
 import com.yx.note_app.utils.jwt.JwtUtils;
@@ -19,7 +18,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.Optional;
 
 @org.springframework.stereotype.Service
-public class LogInService extends Service<LoginRequest, ApiResponse>{
+public class LogInService extends Service<LoginRequest, LoginResponse>{
 
     private static final Logger logger = LoggerFactory.getLogger(LogInService.class);
 
@@ -37,7 +36,7 @@ public class LogInService extends Service<LoginRequest, ApiResponse>{
 
     @Override
     @Transactional
-    public ApiResponse doService(LoginRequest request) {
+    public LoginResponse doService(LoginRequest request) {
         Optional<User> actualUser = userRepository.findByUsername(request.getUsername());
 
         if (actualUser.isPresent() && passwordEncoder.matches(request.getPassword(), actualUser.get().getPassword())) {

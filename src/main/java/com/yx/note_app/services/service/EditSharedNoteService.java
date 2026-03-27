@@ -1,8 +1,6 @@
 package com.yx.note_app.services.service;
 
-import com.yx.note_app.enums.Permission;
 import com.yx.note_app.exception.ResourceNotFoundException;
-import com.yx.note_app.exception.UnauthorizedException;
 import com.yx.note_app.models.SharedNote;
 import com.yx.note_app.repositories.NoteRepository;
 import com.yx.note_app.repositories.ShareNoteRepository;
@@ -37,9 +35,7 @@ public class EditSharedNoteService extends Service<EditShareNoteRequest, ApiResp
             throw ResourceNotFoundException.sharedNoteNotFound(sharedNoteId);
         }
 
-        if(!sharedNote.getSharedToUser().equals(getUserUsingTheService()) || sharedNote.getPermission().equals(Permission.READ)){
-            throw UnauthorizedException.noEditPermission(getUserUsingTheService().getUsername());
-        }
+        assertHasWritePermission(sharedNote);
 
         noteRepository.updateNote(sharedNote.getNote().getId(), request.getUpdatedShareNoteTitle(), request.getUpdatedShareNoteContent());
         logger.info("User {} updated shared note id: {}", getUserUsingTheService().getUsername(), sharedNote.getNote().getId());

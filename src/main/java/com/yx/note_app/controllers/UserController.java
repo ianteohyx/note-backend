@@ -62,8 +62,8 @@ public class UserController {
             content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
     })
     @PostMapping("/login")
-    public ResponseEntity<ApiResponse> verifyUser(@Valid @RequestBody LoginRequest loginRequest) {
-        ApiResponse response = logInService.execute(loginRequest);
+    public ResponseEntity<LoginResponse> verifyUser(@Valid @RequestBody LoginRequest loginRequest) {
+        LoginResponse response = logInService.execute(loginRequest);
         return ResponseEntity.status(response.getResponseOutcome().getHttpStatus()).body(response);
     }
 
@@ -77,8 +77,8 @@ public class UserController {
             content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
     })
     @PostMapping("/refresh")
-    public ResponseEntity<ApiResponse> refreshToken(@Valid @RequestBody RefreshTokenRequest refreshTokenRequest) {
-        ApiResponse response = refreshTokenRequestService.execute(refreshTokenRequest);
+    public ResponseEntity<LoginResponse> refreshToken(@Valid @RequestBody RefreshTokenRequest refreshTokenRequest) {
+        LoginResponse response = refreshTokenRequestService.execute(refreshTokenRequest);
         return ResponseEntity.status(response.getResponseOutcome().getHttpStatus()).body(response);
     }
 }

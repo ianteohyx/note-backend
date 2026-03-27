@@ -73,13 +73,13 @@ public class ShareNoteController {
             content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
     })
     @GetMapping("/received")
-    public ResponseEntity<ApiResponse> getAllSharedToMe(
+    public ResponseEntity<GetAllSharedToMeResponse> getAllSharedToMe(
             @Parameter(description = "Page number (0-indexed)", example = "0") @RequestParam(defaultValue = "0") int page,
             @Parameter(description = "Number of shared notes per page", example = "10") @RequestParam(defaultValue = "10") int size) {
         GetAllSharedToMeRequest request = new GetAllSharedToMeRequest();
         request.setPage(page);
         request.setSize(size);
-        ApiResponse response = getAllSharedToMeService.execute(request);
+        GetAllSharedToMeResponse response = getAllSharedToMeService.execute(request);
         return ResponseEntity.status(response.getResponseOutcome().getHttpStatus()).body(response);
     }
 
@@ -93,10 +93,10 @@ public class ShareNoteController {
             content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
     })
     @GetMapping("/{id}")
-    public ResponseEntity<ApiResponse> getSingleSharedNote(@Parameter(description = "Shared note ID", example = "7") @PathVariable Integer id) {
+    public ResponseEntity<GetSingleSharedNoteResponse> getSingleSharedNote(@Parameter(description = "Shared note ID", example = "7") @PathVariable Integer id) {
         GetSingleSharedNoteRequest request = new GetSingleSharedNoteRequest();
         request.setSharedNoteId(id);
-        ApiResponse response = getSingleSharedNoteService.execute(request);
+        GetSingleSharedNoteResponse response = getSingleSharedNoteService.execute(request);
         return ResponseEntity.status(response.getResponseOutcome().getHttpStatus()).body(response);
     }
 
@@ -126,10 +126,10 @@ public class ShareNoteController {
             content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
     })
     @GetMapping("/note/{noteId}/users")
-    public ResponseEntity<ApiResponse> getSharedToUser(@Parameter(description = "Note ID", example = "42") @PathVariable Integer noteId) {
+    public ResponseEntity<GetSharedToUsersResponse> getSharedToUser(@Parameter(description = "Note ID", example = "42") @PathVariable Integer noteId) {
         GetSharedToUsersRequest request = new GetSharedToUsersRequest();
         request.setId(noteId);
-        ApiResponse response = getSharedToUsersService.execute(request);
+        GetSharedToUsersResponse response = getSharedToUsersService.execute(request);
         return ResponseEntity.status(response.getResponseOutcome().getHttpStatus()).body(response);
     }
 

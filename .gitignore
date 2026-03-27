@@ -37,3 +37,6 @@ logs/
 
 ### Environment ###
 .env
+
+### Claude Code ###
+CLAUDE.md
