@@ -1,53 +1,40 @@
 package com.yx.note_app.services.service;
 
-import com.yx.note_app.enums.ResponseOutcome;
+import com.yx.note_app.exception.ResourceNotFoundException;
 import com.yx.note_app.models.Note;
 import com.yx.note_app.repositories.NoteRepository;
 import com.yx.note_app.services.reponse.ApiResponse;
 import com.yx.note_app.services.reponse.ResponseDirectory;
 import com.yx.note_app.services.request.DeleteNoteRequest;
-import com.yx.note_app.utils.log.DefaultLogger;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.transaction.annotation.Transactional;
+
 import java.util.Objects;
 
 @org.springframework.stereotype.Service
-public class DeleteNoteService extends Service <DeleteNoteRequest, ApiResponse> {
-    private static final Logger log = LoggerFactory.getLogger(DeleteNoteService.class);
-    @Autowired
-    NoteRepository noteRepository;
+public class DeleteNoteService extends Service<DeleteNoteRequest, ApiResponse> {
 
-    private final DefaultLogger logger = new DefaultLogger(this.getClass());
+    private static final Logger logger = LoggerFactory.getLogger(DeleteNoteService.class);
+
+    @Autowired
+    private NoteRepository noteRepository;
 
     @Override
+    @Transactional
     public ApiResponse doService(DeleteNoteRequest request) {
-        // check if note exist
         int id = request.getNoteId();
         Note note = noteRepository.findById(id);
+
         if (Objects.isNull(note)){
-            logger.log("deleting unexisted note: " + request.getNoteId() +" by user: " + getUserUsingTheService().getUsername());
-            return ResponseDirectory.buildFailResponse(ResponseOutcome.NOTE_NOT_EXIST);
+            throw ResourceNotFoundException.noteNotFound(id);
         }
 
-        // check if action is authorized
-        if (!note.getAuthor().equals(getUserUsingTheService())){
-            logger.log("unauthorized action by user: " + getUserUsingTheService().getUsername());
-            return ResponseDirectory.buildFailResponse(ResponseOutcome.ACTION_NOT_ALLOWED);
-        }
+        assertIsOwner(note);
 
         noteRepository.deleteById(id);
-        logger.log("deleted note id: " + request.getNoteId());
+        logger.info("Deleted note id: {}", id);
         return ResponseDirectory.buildSuccessResponse();
-    }
-
-    @Override
-    public boolean paramCheck(DeleteNoteRequest request){
-        return super.paramCheck(request) && Objects.nonNull(request.getNoteId());
-    }
-
-    @Override
-    public void determineIfNeedTokenValidation() {
-        setNeedTokenValidation(true);
     }
 }

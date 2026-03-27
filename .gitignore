@@ -31,3 +31,12 @@ build/
 
 ### VS Code ###
 .vscode/
+
+### Logs ###
+logs/
+
+### Environment ###
+.env
+
+### Claude Code ###
+CLAUDE.md

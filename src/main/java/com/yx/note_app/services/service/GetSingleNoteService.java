@@ -1,55 +1,44 @@
 package com.yx.note_app.services.service;
 
 import com.yx.note_app.enums.ResponseOutcome;
+import com.yx.note_app.exception.ResourceNotFoundException;
 import com.yx.note_app.models.Note;
 import com.yx.note_app.repositories.NoteRepository;
-import com.yx.note_app.services.reponse.ApiResponse;
 import com.yx.note_app.services.reponse.GetSingleNoteResponse;
-import com.yx.note_app.services.reponse.ResponseDirectory;
 import com.yx.note_app.services.request.GetSingleNoteRequest;
-import com.yx.note_app.utils.log.DefaultLogger;
 import com.yx.note_app.utils.mapper.Note2NoteDto;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.transaction.annotation.Transactional;
+
 import java.util.Objects;
 
 @org.springframework.stereotype.Service
-public class GetSingleNoteService extends Service <GetSingleNoteRequest, ApiResponse>{
+public class GetSingleNoteService extends Service<GetSingleNoteRequest, GetSingleNoteResponse>{
+
+    private static final Logger logger = LoggerFactory.getLogger(GetSingleNoteService.class);
 
     @Autowired
     private NoteRepository noteRepository;
-    private final DefaultLogger logger = new DefaultLogger(this.getClass());
 
     @Override
-    public boolean paramCheck(GetSingleNoteRequest getSingleNoteRequest){
-        return super.paramCheck(getSingleNoteRequest) && Objects.nonNull(getSingleNoteRequest.getNoteId());
-    }
-
-    @Override
-    public ApiResponse doService(GetSingleNoteRequest request) {
-        // check if note exist
+    @Transactional(readOnly = true)
+    public GetSingleNoteResponse doService(GetSingleNoteRequest request) {
         int id = request.getNoteId();
         Note note = noteRepository.findById(id);
+
         if (Objects.isNull(note)){
-            logger.log("getting note id that does not exist: " + request.getNoteId() +" by user: " + getUserUsingTheService().getUsername());
-            return ResponseDirectory.buildFailResponse(ResponseOutcome.NOTE_NOT_EXIST);
+            throw ResourceNotFoundException.noteNotFound(id);
         }
 
-        // check if action is authorized
-        if (!note.getAuthor().equals(getUserUsingTheService())){
-            logger.log("unauthorized action by user: " + getUserUsingTheService().getUsername());
-            return ResponseDirectory.buildFailResponse(ResponseOutcome.ACTION_NOT_ALLOWED);
-        }
+        assertIsOwner(note);
 
-        logger.log("getting note id: " + request.getNoteId() +" by user: " + getUserUsingTheService().getUsername());
+        logger.info("User {} retrieved note id: {}", getUserUsingTheService().getUsername(), id);
         return buildGetSingleNoteResponse(note);
     }
 
-    @Override
-    public void determineIfNeedTokenValidation() {
-        setNeedTokenValidation(true);
-    }
-
-    public GetSingleNoteResponse buildGetSingleNoteResponse(Note note){
+    private GetSingleNoteResponse buildGetSingleNoteResponse(Note note){
         GetSingleNoteResponse getSingleNoteResponse = new GetSingleNoteResponse();
         Note2NoteDto note2NoteDto = new Note2NoteDto();
         getSingleNoteResponse.setNoteDto(note2NoteDto.toResponse(note));

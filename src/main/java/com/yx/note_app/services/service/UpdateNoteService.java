@@ -1,55 +1,40 @@
 package com.yx.note_app.services.service;
 
-import com.yx.note_app.enums.ResponseOutcome;
+import com.yx.note_app.exception.ResourceNotFoundException;
 import com.yx.note_app.models.Note;
 import com.yx.note_app.repositories.NoteRepository;
 import com.yx.note_app.services.reponse.ApiResponse;
 import com.yx.note_app.services.reponse.ResponseDirectory;
 import com.yx.note_app.services.request.UpdateNoteRequest;
-import com.yx.note_app.utils.log.DefaultLogger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.transaction.annotation.Transactional;
+
 import java.util.Objects;
 
 @org.springframework.stereotype.Service
-public class UpdateNoteService extends Service <UpdateNoteRequest, ApiResponse>{
+public class UpdateNoteService extends Service<UpdateNoteRequest, ApiResponse>{
+
+    private static final Logger logger = LoggerFactory.getLogger(UpdateNoteService.class);
 
     @Autowired
-    NoteRepository noteRepository;
-
-    private final DefaultLogger logger = new DefaultLogger(this.getClass());
+    private NoteRepository noteRepository;
 
     @Override
+    @Transactional
     public ApiResponse doService(UpdateNoteRequest request) {
-        // check if note exist
         int id = request.getNoteId();
         Note note = noteRepository.findById(id);
+
         if (Objects.isNull(note)){
-            logger.log("updating unexisted note: " + request.getNoteId() +" by user: " + getUserUsingTheService().getUsername());
-            return ResponseDirectory.buildFailResponse(ResponseOutcome.NOTE_NOT_EXIST);
+            throw ResourceNotFoundException.noteNotFound(id);
         }
 
-        // check if action is authorized
-        if (!note.getAuthor().equals(getUserUsingTheService())){
-            logger.log("unauthorized action by user: " + getUserUsingTheService().getUsername());
-            return ResponseDirectory.buildFailResponse(ResponseOutcome.ACTION_NOT_ALLOWED);
-        }
+        assertIsOwner(note);
 
         noteRepository.updateNote(request.getNoteId(), request.getNoteTitle(), request.getNoteContent());
-        logger.log("updated note id: " + request.getNoteId() + "by user: " + getUserUsingTheService());
+        logger.info("Updated note id: {} by user: {}", request.getNoteId(), getUserUsingTheService().getUsername());
         return ResponseDirectory.buildSuccessResponse();
-    }
-
-    @Override
-    public boolean paramCheck(UpdateNoteRequest request){
-        return super.paramCheck(request)
-                && Objects.nonNull(request.getToken())
-                && Objects.nonNull(request.getNoteId())
-                && Objects.nonNull(request.getNoteTitle())
-                && Objects.nonNull(request.getNoteContent());
-    }
-
-    @Override
-    public void determineIfNeedTokenValidation() {
-        setNeedTokenValidation(true);
     }
 }

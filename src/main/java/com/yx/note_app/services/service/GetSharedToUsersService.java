@@ -1,42 +1,40 @@
 package com.yx.note_app.services.service;
 
 import com.yx.note_app.enums.ResponseOutcome;
+import com.yx.note_app.exception.ResourceNotFoundException;
 import com.yx.note_app.models.Note;
 import com.yx.note_app.models.User;
 import com.yx.note_app.repositories.NoteRepository;
-import com.yx.note_app.services.reponse.ApiResponse;
 import com.yx.note_app.services.reponse.GetSharedToUsersResponse;
-import com.yx.note_app.services.reponse.ResponseDirectory;
 import com.yx.note_app.services.request.GetSharedToUsersRequest;
-import com.yx.note_app.utils.log.DefaultLogger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.transaction.annotation.Transactional;
+
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 
 @org.springframework.stereotype.Service
-public class GetSharedToUsersService extends Service<GetSharedToUsersRequest, ApiResponse> {
+public class GetSharedToUsersService extends Service<GetSharedToUsersRequest, GetSharedToUsersResponse> {
+
+    private static final Logger logger = LoggerFactory.getLogger(GetSharedToUsersService.class);
 
     @Autowired
-    NoteRepository noteRepository;
-
-    private final DefaultLogger logger = new DefaultLogger(this.getClass());
+    private NoteRepository noteRepository;
 
     @Override
-    public ApiResponse doService(GetSharedToUsersRequest request) {
-        Note note = noteRepository.findById((int)request.getNoteId());
+    @Transactional(readOnly = true)
+    public GetSharedToUsersResponse doService(GetSharedToUsersRequest request) {
+        Note note = noteRepository.findByIdWithSharedUsers((int)request.getNoteId());
 
         if (Objects.isNull(note)){
-            logger.log("getting note id that does not exist: " + request.getNoteId() +" by user: " + getUserUsingTheService().getUsername());
-            return ResponseDirectory.buildFailResponse(ResponseOutcome.NOTE_NOT_EXIST);
+            throw ResourceNotFoundException.noteNotFound(request.getNoteId());
         }
 
-        // check if action is authorized
-        if (!note.getAuthor().equals(getUserUsingTheService())){
-            logger.log("unauthorized action by user: " + getUserUsingTheService().getUsername());
-            return ResponseDirectory.buildFailResponse(ResponseOutcome.ACTION_NOT_ALLOWED);
-        }
+        assertIsOwner(note);
 
         List<String> usernames = new ArrayList<>();
         note.getSharedNotes().forEach(sharedNote -> {
@@ -45,25 +43,14 @@ public class GetSharedToUsersService extends Service<GetSharedToUsersRequest, Ap
                     .ifPresent(usernames::add);
         });
 
+        logger.info("User {} retrieved shared users for note {}", getUserUsingTheService().getUsername(), request.getNoteId());
         return buildSuccessSharedToUserResponse(usernames);
     }
 
-    @Override
-    public boolean paramCheck(GetSharedToUsersRequest request){
-        return super.paramCheck(request)
-                && Objects.nonNull(request.getNoteId());
-    }
-
-    @Override
-    public void determineIfNeedTokenValidation() {
-        setNeedTokenValidation(true);
-    }
-
-    public GetSharedToUsersResponse buildSuccessSharedToUserResponse(List<String> usernames){
+    private GetSharedToUsersResponse buildSuccessSharedToUserResponse(List<String> usernames){
         GetSharedToUsersResponse getSharedToUsersResponse = new GetSharedToUsersResponse();
         getSharedToUsersResponse.setUsernames(usernames);
         getSharedToUsersResponse.setResponseOutcome(ResponseOutcome.SUCCESS);
-
         return getSharedToUsersResponse;
     }
 }

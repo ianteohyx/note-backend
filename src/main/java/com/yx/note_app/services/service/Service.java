@@ -1,79 +1,47 @@
 package com.yx.note_app.services.service;
 
-import com.yx.note_app.enums.ResponseOutcome;
+import com.yx.note_app.enums.Permission;
+import com.yx.note_app.exception.UnauthorizedException;
+import com.yx.note_app.models.Note;
+import com.yx.note_app.models.SharedNote;
 import com.yx.note_app.models.User;
-import com.yx.note_app.repositories.UserRepository;
+import com.yx.note_app.security.AuthenticationService;
 import com.yx.note_app.services.reponse.ApiResponse;
-import com.yx.note_app.services.reponse.ResponseDirectory;
 import com.yx.note_app.services.request.ApiRequest;
-import com.yx.note_app.utils.log.DefaultLogger;
-import com.yx.note_app.utils.jwt.JwtUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 
-import java.util.Objects;
-import java.util.Optional;
-
 public abstract class Service<Request extends ApiRequest, Response extends ApiResponse> {
-     private boolean needTokenValidation;
-     private User userUsingTheService;
-     private final DefaultLogger logger = new DefaultLogger(this.getClass());
 
-     @Autowired
-     protected JwtUtils jwtUtils;
-     @Autowired
-     private UserRepository userRepository;
+    @Autowired
+    protected AuthenticationService authenticationService;
 
-     public abstract Response doService(Request request);
-     public abstract void determineIfNeedTokenValidation();
-
-    public boolean paramCheck(Request request){return Objects.nonNull(request);}
-
-    private boolean isNeedTokenValidation() {
-        return needTokenValidation;
-    }
-
-    public void setNeedTokenValidation(boolean needTokenValidation) {
-        this.needTokenValidation = needTokenValidation;
-    }
-
-    public void setUserUsingTheService(String token){
-        String username = jwtUtils.getUsernameFromToken(token);
-        Optional<User> user = userRepository.findByUsername(username);
-        user.ifPresent(value -> userUsingTheService = value);
-    }
+    public abstract Response doService(Request request);
 
     public User getUserUsingTheService() {
-        return userUsingTheService;
+        return authenticationService.getCurrentUser();
     }
 
-    public ApiResponse execute(Request request){
-         determineIfNeedTokenValidation();
-         if (isNeedTokenValidation()){
-             try {
-                 jwtUtils.validateToken(request.getToken());
-                 setUserUsingTheService(request.getToken());
-             }
-             catch (Exception e){
-                 System.out.println(e.getMessage());
-                 logger.log(e.getMessage());
-                 return ResponseDirectory.buildFailResponse(ResponseOutcome.TOKEN_INVALID);
-             }
-         }
+    public Response execute(Request request) {
+        // Let exceptions bubble up to GlobalExceptionHandler
+        // Validation is now handled by @Valid annotations in controllers
+        return doService(request);
+    }
 
-         if (!paramCheck(request)){
-             return ResponseDirectory.buildFailResponse(ResponseOutcome.PARAM_ILLEGAL);
-         }
+    protected void assertIsOwner(Note note) {
+        if (!note.getAuthor().equals(getUserUsingTheService())) {
+            throw UnauthorizedException.notOwner(getUserUsingTheService().getUsername());
+        }
+    }
 
-         else{
-             try {
-                 return doService(request);
-             }
+    protected void assertIsRecipient(SharedNote sharedNote) {
+        if (!sharedNote.getSharedToUser().equals(getUserUsingTheService())) {
+            throw UnauthorizedException.notOwner(getUserUsingTheService().getUsername());
+        }
+    }
 
-             catch (Exception e){
-                 System.out.println(e.getMessage());
-                 logger.log(e.getMessage());
-                 return ResponseDirectory.buildFailResponse(ResponseOutcome.PROCESS_FAIL);
-             }
-         }
-     }
+    protected void assertHasWritePermission(SharedNote sharedNote) {
+        if (!sharedNote.getSharedToUser().equals(getUserUsingTheService()) || sharedNote.getPermission().equals(Permission.READ)) {
+            throw UnauthorizedException.noEditPermission(getUserUsingTheService().getUsername());
+        }
+    }
 }

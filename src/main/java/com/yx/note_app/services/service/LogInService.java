@@ -1,50 +1,61 @@
 package com.yx.note_app.services.service;
 
 import com.yx.note_app.enums.ResponseOutcome;
+import com.yx.note_app.exception.InvalidCredentialsException;
+import com.yx.note_app.models.RefreshToken;
 import com.yx.note_app.models.User;
 import com.yx.note_app.repositories.UserRepository;
-import com.yx.note_app.services.reponse.ApiResponse;
+import com.yx.note_app.security.RefreshTokenService;
 import com.yx.note_app.services.reponse.LoginResponse;
-import com.yx.note_app.services.reponse.ResponseDirectory;
 import com.yx.note_app.services.request.LoginRequest;
-import com.yx.note_app.utils.log.DefaultLogger;
+import com.yx.note_app.utils.jwt.JwtUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import java.util.Objects;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.transaction.annotation.Transactional;
+
 import java.util.Optional;
 
 @org.springframework.stereotype.Service
-public class LogInService extends Service<LoginRequest, ApiResponse>{
+public class LogInService extends Service<LoginRequest, LoginResponse>{
+
+    private static final Logger logger = LoggerFactory.getLogger(LogInService.class);
+
     @Autowired
     private UserRepository userRepository;
-    private final DefaultLogger logger = new DefaultLogger(this.getClass());
+
+    @Autowired
+    private JwtUtils jwtUtils;
+
+    @Autowired
+    private PasswordEncoder passwordEncoder;
+
+    @Autowired
+    private RefreshTokenService refreshTokenService;
 
     @Override
-    public boolean paramCheck(LoginRequest request) {
-        return super.paramCheck(request) && Objects.nonNull(request.getUsername()) && Objects.nonNull(request.getPassword());
+    @Transactional
+    public LoginResponse doService(LoginRequest request) {
+        Optional<User> actualUser = userRepository.findByUsername(request.getUsername());
+
+        if (actualUser.isPresent() && passwordEncoder.matches(request.getPassword(), actualUser.get().getPassword())) {
+            logger.info("Login successful");
+            User user = actualUser.get();
+            String jwt = jwtUtils.generateToken(user);
+            RefreshToken refreshToken = refreshTokenService.createRefreshToken(user);
+            return buildSuccessLoginResponse(jwt, refreshToken.getToken());
+        }
+
+        logger.warn("Login attempt failed - invalid credentials");
+        throw InvalidCredentialsException.loginFailed();
     }
 
-    @Override
-    public void determineIfNeedTokenValidation() {
-        setNeedTokenValidation(false);
-    }
-
-    @Override
-    public ApiResponse doService(LoginRequest request) {
-            Optional<User> actualUser = userRepository.findByUsername(request.getUsername());
-
-            if (actualUser.isPresent() && request.getPassword().equals(actualUser.get().getPassword())) {
-                logger.log("login success: " + request.getUsername());
-                return buildSuccessLoginResponse(jwtUtils.generateToken(actualUser.get()));
-            }
-
-            logger.log("login fail: " + request.getUsername());
-            return ResponseDirectory.buildFailResponse(ResponseOutcome.LOGIN_FAIL);
-    }
-
-    public LoginResponse buildSuccessLoginResponse(String token){
+    private LoginResponse buildSuccessLoginResponse(String token, String refreshToken){
         LoginResponse loginResponse = new LoginResponse();
         loginResponse.setResponseOutcome(ResponseOutcome.SUCCESS);
         loginResponse.setToken(token);
+        loginResponse.setRefreshToken(refreshToken);
         return loginResponse;
     }
 }

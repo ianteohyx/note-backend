@@ -1,6 +1,6 @@
 package com.yx.note_app.services.service;
 
-import com.yx.note_app.enums.ResponseOutcome;
+import com.yx.note_app.exception.ResourceNotFoundException;
 import com.yx.note_app.models.Note;
 import com.yx.note_app.models.SharedNote;
 import com.yx.note_app.models.User;
@@ -10,70 +10,52 @@ import com.yx.note_app.repositories.UserRepository;
 import com.yx.note_app.services.reponse.ApiResponse;
 import com.yx.note_app.services.reponse.ResponseDirectory;
 import com.yx.note_app.services.request.UnshareNoteRequest;
-import com.yx.note_app.utils.log.DefaultLogger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.transaction.annotation.Transactional;
+
 import java.util.Objects;
 import java.util.Optional;
 
 @org.springframework.stereotype.Service
-public class UnshareNoteService extends Service <UnshareNoteRequest, ApiResponse> {
-    @Autowired
-    UserRepository userRepository;
+public class UnshareNoteService extends Service<UnshareNoteRequest, ApiResponse> {
+
+    private static final Logger logger = LoggerFactory.getLogger(UnshareNoteService.class);
 
     @Autowired
-    NoteRepository noteRepository;
+    private UserRepository userRepository;
 
     @Autowired
-    ShareNoteRepository shareNoteRepository;
+    private NoteRepository noteRepository;
 
-    private final DefaultLogger logger = new DefaultLogger(this.getClass());
+    @Autowired
+    private ShareNoteRepository shareNoteRepository;
 
     @Override
+    @Transactional
     public ApiResponse doService(UnshareNoteRequest request) {
-        // get the user id
         Optional<User> user = userRepository.findByUsername(request.getSharedToUsername());
 
         if(user.isEmpty()){
-            logger.log("removing a user that does not exist from a share note username: " + request.getSharedToUsername());
-            return ResponseDirectory.buildFailResponse(ResponseOutcome.USER_NOT_EXIST);
+            throw ResourceNotFoundException.userNotFound(request.getSharedToUsername());
         }
 
-        // check if note exist
         Note note = noteRepository.findById((int)request.getNoteId());
         if (Objects.isNull(note)){
-            logger.log("unsharing a note that does not exist: " + request.getNoteId() +" by user: " + getUserUsingTheService().getUsername());
-            return ResponseDirectory.buildFailResponse(ResponseOutcome.NOTE_NOT_EXIST);
+            throw ResourceNotFoundException.noteNotFound(request.getNoteId());
         }
 
-        // check if action is authorized
-        if (!note.getAuthor().equals(getUserUsingTheService())){
-            logger.log("unauthorized action by user: " + getUserUsingTheService().getUsername());
-            return ResponseDirectory.buildFailResponse(ResponseOutcome.ACTION_NOT_ALLOWED);
-        }
+        assertIsOwner(note);
 
-        // get the share note to unshare
         SharedNote sharedNote = shareNoteRepository.findByNoteIdAndSharedToUserId(note.getId(), user.get().getId());
 
         if (Objects.isNull(sharedNote)){
-            logger.log("note id: " + note.getId() + " is not shared to user: " + user.get().getUsername());
-            return ResponseDirectory.buildFailResponse(ResponseOutcome.NOTE_NOT_SHARED);
+            throw ResourceNotFoundException.noteNotSharedToUser(note.getId(), user.get().getUsername());
         }
 
-        // remove the share note
         shareNoteRepository.deleteById(sharedNote.getId());
-        logger.log("unshare note id: " +  note.getId() + " to user: " + user.get().getUsername());
+        logger.info("User {} unshared note {} from user {}", getUserUsingTheService().getUsername(), note.getId(), user.get().getUsername());
         return ResponseDirectory.buildSuccessResponse();
-    }
-
-    @Override
-    public boolean paramCheck(UnshareNoteRequest request){
-        return super.paramCheck(request)
-                && Objects.nonNull(request.getSharedToUsername())
-                && Objects.nonNull(request.getNoteId());
-    }
-
-    @Override
-    public void determineIfNeedTokenValidation() {
-        setNeedTokenValidation(true);
     }
 }

@@ -14,7 +14,7 @@ public class Note extends Model{
     @Column(nullable = false)
     private String title;
 
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "authorId", nullable = false)
     private User author;
 

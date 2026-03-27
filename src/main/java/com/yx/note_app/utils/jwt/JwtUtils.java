@@ -2,11 +2,10 @@ package com.yx.note_app.utils.jwt;
 
 import com.yx.note_app.models.User;
 import io.jsonwebtoken.Jwts;
-import io.jsonwebtoken.SignatureAlgorithm;
-import io.jsonwebtoken.security.Keys;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
-import java.security.Key;
+
+import javax.crypto.SecretKey;
 import java.util.Base64;
 import java.util.Date;
 
@@ -15,33 +14,36 @@ public class JwtUtils {
     @Value("${jwt.secret}")
     private String SECRET_KEY;
 
-    private Key getSigningKey() {
+    @Value("${jwt.expiration-ms:900000}")
+    private long EXPIRATION_MS; // Default 15 minutes
+
+    private SecretKey getSigningKey() {
         byte[] keyBytes = Base64.getDecoder().decode(SECRET_KEY);
-        return Keys.hmacShaKeyFor(keyBytes);
+        return io.jsonwebtoken.security.Keys.hmacShaKeyFor(keyBytes);
     }
 
     public String generateToken(User user) {
-        // 15 mins
-        long EXPIRATION_MS = 60 * 15 * 1000;
-
         return Jwts.builder()
-                .setSubject(user.getUsername())
-                .setIssuedAt(new Date())
-                .setExpiration(new Date(System.currentTimeMillis() + EXPIRATION_MS))
-                .signWith(getSigningKey(), SignatureAlgorithm.HS512)
+                .subject(user.getUsername())
+                .issuedAt(new Date())
+                .expiration(new Date(System.currentTimeMillis() + EXPIRATION_MS))
+                .signWith(getSigningKey(), Jwts.SIG.HS512)
                 .compact();
     }
 
     public String getUsernameFromToken(String token) {
-        return Jwts.parserBuilder()
-                .setSigningKey(getSigningKey())
+        return Jwts.parser()
+                .verifyWith(getSigningKey())
                 .build()
-                .parseClaimsJws(token)
-                .getBody()
+                .parseSignedClaims(token)
+                .getPayload()
                 .getSubject();
     }
 
     public void validateToken(String token) {
-        Jwts.parserBuilder().setSigningKey(getSigningKey()).build().parseClaimsJws(token);
+        Jwts.parser()
+                .verifyWith(getSigningKey())
+                .build()
+                .parseSignedClaims(token);
     }
 }
