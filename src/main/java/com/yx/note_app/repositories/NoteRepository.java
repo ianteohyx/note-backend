@@ -35,7 +35,7 @@ public interface NoteRepository extends JpaRepository<Note, Integer>{
     // Update note by id
     @Modifying
     @Transactional
-    @Query("UPDATE Note n SET n.title = :title, n.content = :content WHERE n.id = :id")
+    @Query("UPDATE Note n SET n.title = :title, n.content = :content, n.dateModified = CURRENT_TIMESTAMP WHERE n.id = :id")
     void updateNote(
             @Param("id") int id,
             @Param("title") String title,
