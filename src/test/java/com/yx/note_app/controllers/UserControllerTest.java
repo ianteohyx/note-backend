@@ -8,7 +8,6 @@ import com.yx.note_app.exception.InvalidRefreshTokenException;
 import com.yx.note_app.services.reponse.LoginResponse;
 import com.yx.note_app.services.reponse.ResponseDirectory;
 import com.yx.note_app.services.request.LoginRequest;
-import com.yx.note_app.services.request.RefreshTokenRequest;
 import com.yx.note_app.services.request.SignUpRequest;
 import com.yx.note_app.services.service.LogInService;
 import com.yx.note_app.services.service.RefreshTokenRequestService;
@@ -20,13 +19,19 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.MediaType;
+import org.springframework.http.ResponseCookie;
+import com.yx.note_app.security.RefreshTokenCookieFactory;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.validation.beanvalidation.LocalValidatorFactoryBean;
 
+import jakarta.servlet.http.Cookie;
+
+import static org.hamcrest.Matchers.containsString;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -44,6 +49,9 @@ class UserControllerTest {
 
     @Mock
     private RefreshTokenRequestService refreshTokenRequestService;
+
+    @Mock
+    private RefreshTokenCookieFactory refreshTokenCookieFactory;
 
     private MockMvc mockMvc;
     private ObjectMapper objectMapper;
@@ -102,13 +110,16 @@ class UserControllerTest {
     }
 
     @Test
-    void login_validCredentials_returns200WithTokens() throws Exception {
+    void login_validCredentials_returnsJwtInBodyAndRefreshTokenCookie() throws Exception {
         LoginResponse loginResponse = new LoginResponse();
         loginResponse.setResponseOutcome(ResponseOutcome.SUCCESS);
         loginResponse.setToken("jwt-token");
         loginResponse.setRefreshToken("refresh-token");
 
         when(logInService.execute(any())).thenReturn(loginResponse);
+        when(refreshTokenCookieFactory.create("refresh-token"))
+                .thenReturn(ResponseCookie.from("refreshToken", "refresh-token")
+                        .httpOnly(true).path("/api/users").build());
 
         LoginRequest request = new LoginRequest();
         request.setUsername("ian");
@@ -119,7 +130,9 @@ class UserControllerTest {
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.token").value("jwt-token"))
-                .andExpect(jsonPath("$.refreshToken").value("refresh-token"));
+                .andExpect(jsonPath("$.refreshToken").doesNotExist())
+                .andExpect(header().string("Set-Cookie", containsString("refreshToken=refresh-token")))
+                .andExpect(header().string("Set-Cookie", containsString("HttpOnly")));
     }
 
     @Test
@@ -138,35 +151,38 @@ class UserControllerTest {
     }
 
     @Test
-    void refresh_validToken_returns200WithNewTokens() throws Exception {
+    void refresh_validCookie_returnsNewJwtAndRotatedCookie() throws Exception {
         LoginResponse loginResponse = new LoginResponse();
         loginResponse.setResponseOutcome(ResponseOutcome.SUCCESS);
         loginResponse.setToken("new-jwt");
         loginResponse.setRefreshToken("new-refresh");
 
         when(refreshTokenRequestService.execute(any())).thenReturn(loginResponse);
-
-        RefreshTokenRequest request = new RefreshTokenRequest();
-        request.setRefreshToken("old-refresh-token");
+        when(refreshTokenCookieFactory.create("new-refresh"))
+                .thenReturn(ResponseCookie.from("refreshToken", "new-refresh")
+                        .httpOnly(true).path("/api/users").build());
 
         mockMvc.perform(post("/api/users/refresh")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(request)))
+                        .cookie(new Cookie("refreshToken", "old-refresh-token")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.token").value("new-jwt"))
-                .andExpect(jsonPath("$.refreshToken").value("new-refresh"));
+                .andExpect(jsonPath("$.refreshToken").doesNotExist())
+                .andExpect(header().string("Set-Cookie", containsString("refreshToken=new-refresh")));
     }
 
     @Test
-    void refresh_invalidToken_returns401() throws Exception {
+    void refresh_invalidCookie_returns401() throws Exception {
         when(refreshTokenRequestService.execute(any())).thenThrow(InvalidRefreshTokenException.invalid());
 
-        RefreshTokenRequest request = new RefreshTokenRequest();
-        request.setRefreshToken("bad-token");
-
         mockMvc.perform(post("/api/users/refresh")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(request)))
+                        .cookie(new Cookie("refreshToken", "bad-token")))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.responseOutcome").value("REFRESH_TOKEN_INVALID"));
+    }
+
+    @Test
+    void refresh_missingCookie_returns401() throws Exception {
+        mockMvc.perform(post("/api/users/refresh"))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.responseOutcome").value("REFRESH_TOKEN_INVALID"));
     }
