@@ -38,7 +38,7 @@ src/main/java/com/yx/note_app/
 ├── exception/       - Custom exceptions + GlobalExceptionHandler
 ├── models/          - JPA entities (User, Note, SharedNote, RefreshToken)
 ├── repositories/    - Spring Data JPA interfaces
-├── security/        - JWT filter, rate limiting filter, auth service, refresh token service
+├── security/        - JWT filter, rate limiting filter, auth service, refresh token service, RefreshTokenCookieFactory
 ├── services/
 │   ├── request/     - Request POJOs for each service
 │   ├── response/    - Response POJOs (ApiResponse subclasses)
@@ -56,8 +56,9 @@ src/main/java/com/yx/note_app/
 | Method | Path | Service | Description |
 |--------|------|---------|-------------|
 | POST | `/api/users/signup` | SignUpService | Register new user |
-| POST | `/api/users/login` | LogInService | Login, returns JWT + refresh token |
-| POST | `/api/users/refresh` | RefreshTokenRequestService | Rotate refresh token, get new JWT |
+| POST | `/api/users/login` | LogInService | Login, returns JWT in body + refresh token as HttpOnly cookie |
+| POST | `/api/users/refresh` | RefreshTokenRequestService | Reads `refreshToken` cookie, rotates it (new cookie), returns new JWT. No request body. |
+| POST | `/api/users/logout` | (controller → RefreshTokenService) | Reads `refreshToken` cookie, revokes that token, and returns a `Set-Cookie` that clears it (`Max-Age=0`). No request body. Idempotent — always 200 `SUCCESS`, even with a missing/unknown/already-revoked cookie. |
 
 ### Protected (requires `Authorization: Bearer <token>`)
 | Method | Path | Service | Description |
@@ -161,7 +162,7 @@ All responses extend `ApiResponse` which carries a `ResponseOutcome`.
 |-------|--------|
 | `ApiResponse` | `responseOutcome` |
 | `ErrorResponse` | `+ message, fieldErrors: Map<String,String>` |
-| `LoginResponse` | `+ token (JWT), refreshToken` |
+| `LoginResponse` | `+ token (JWT)` — refresh token is NOT in the body; it is sent as the `refreshToken` HttpOnly cookie (`refreshToken` field is `@JsonIgnore`, used only internally to pass the value from service to controller) |
 | `GetAllNoteResponse` | `+ notes: List<NoteDto>` |
 | `GetSingleNoteResponse` | `+ noteDto` |
 | `GetAllSharedToMeResponse` | `+ sharedNotes: List<SharedNoteDto>` |
@@ -237,7 +238,14 @@ Always throw these instead of returning error codes manually from services.
 ### Refresh Token
 - Storage: DB (`refreshtokens` table)
 - Expiration: 7 days (configurable via `REFRESH_TOKEN_EXPIRATION_MS`, default 604800000)
-- **Token rotation**: on each refresh, old token is revoked and a new one is issued
+- **Delivery**: sent to the client only as an **HttpOnly cookie** named `refreshToken` (never in the response body). Built by `RefreshTokenCookieFactory` (in `security/`).
+  - `Set-Cookie` on `POST /api/users/login` and `POST /api/users/refresh` responses
+  - `POST /api/users/refresh` takes **no body** — it reads the `refreshToken` cookie via `@CookieValue`; missing/blank cookie → `InvalidRefreshTokenException.invalid()` (401)
+  - `POST /api/users/logout` takes **no body** — reads the `refreshToken` cookie, calls `RefreshTokenService.revokeRefreshToken(token)` (best-effort single-token revoke, no-op if missing/unknown/already-revoked), and responds with `RefreshTokenCookieFactory.clear()` (`Max-Age=0`, same attributes) to evict the cookie. Always 200 `SUCCESS`.
+  - Cookie attributes: `HttpOnly`, `Secure` (configurable), `SameSite` (configurable), `Path` (configurable, default `/api/users`), `Max-Age` = refresh token TTL (or `0` on logout)
+  - **dev profile**: `Secure=false`, `SameSite=Lax` — works over `http://localhost` and for a same-site frontend (`localhost:5173` → `localhost:8080`), and Postman sends it automatically via its cookie jar
+  - **prod profile**: `Secure=true`, `SameSite=None` — required when the deployed frontend is on a different site; also needs CORS `allowCredentials=true` (already set) and the frontend using `credentials: 'include'` / `withCredentials: true`
+- **Token rotation**: on each refresh, old token is revoked and a new one is issued (new cookie)
 - **Security**: if a revoked token is used, ALL tokens for that user are immediately revoked
 - Cleanup: scheduled daily at 3 AM via `ScheduledTasks`
 
@@ -279,6 +287,9 @@ Always throw these instead of returning error codes manually from services.
 | `cors.allowed-origins` | No (dev) / Yes (prod) | - | CORS allowed origin |
 | `CORS_ALLOWED_ORIGINS` | Yes (prod) | - | Frontend URL for CORS in prod profile |
 | `jwt.expiration-ms` | No | 900000 (15m) | JWT access token TTL |
+| `REFRESH_COOKIE_PATH` | No | `/api/users` | `Path` attribute of the `refreshToken` cookie |
+| `REFRESH_COOKIE_SECURE` | No (prod only) | `true` | `Secure` attribute of the `refreshToken` cookie. dev profile hard-codes `false`; prod defaults `true` |
+| `REFRESH_COOKIE_SAME_SITE` | No (prod only) | `None` | `SameSite` attribute of the `refreshToken` cookie. dev profile hard-codes `Lax`; prod defaults `None` (cross-site frontend) |
 
 Set in `.env` for local dev. Set as server env vars on AWS EC2 for prod.
 
