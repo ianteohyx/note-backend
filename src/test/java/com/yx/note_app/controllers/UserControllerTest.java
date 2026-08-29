@@ -21,6 +21,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseCookie;
 import com.yx.note_app.security.RefreshTokenCookieFactory;
+import com.yx.note_app.security.RefreshTokenService;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.validation.beanvalidation.LocalValidatorFactoryBean;
@@ -29,6 +30,8 @@ import jakarta.servlet.http.Cookie;
 
 import static org.hamcrest.Matchers.containsString;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
@@ -52,6 +55,9 @@ class UserControllerTest {
 
     @Mock
     private RefreshTokenCookieFactory refreshTokenCookieFactory;
+
+    @Mock
+    private RefreshTokenService refreshTokenService;
 
     private MockMvc mockMvc;
     private ObjectMapper objectMapper;
@@ -185,5 +191,35 @@ class UserControllerTest {
         mockMvc.perform(post("/api/users/refresh"))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.responseOutcome").value("REFRESH_TOKEN_INVALID"));
+    }
+
+    @Test
+    void logout_withCookie_revokesTokenAndClearsCookie() throws Exception {
+        when(refreshTokenCookieFactory.clear())
+                .thenReturn(ResponseCookie.from("refreshToken", "")
+                        .httpOnly(true).path("/api/users").maxAge(0).build());
+
+        mockMvc.perform(post("/api/users/logout")
+                        .cookie(new Cookie("refreshToken", "some-refresh-token")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.responseOutcome").value("SUCCESS"))
+                .andExpect(header().string("Set-Cookie", containsString("refreshToken=;")))
+                .andExpect(header().string("Set-Cookie", containsString("Max-Age=0")));
+
+        verify(refreshTokenService).revokeRefreshToken("some-refresh-token");
+    }
+
+    @Test
+    void logout_withoutCookie_returns200AndClearsCookieWithoutRevoking() throws Exception {
+        when(refreshTokenCookieFactory.clear())
+                .thenReturn(ResponseCookie.from("refreshToken", "")
+                        .httpOnly(true).path("/api/users").maxAge(0).build());
+
+        mockMvc.perform(post("/api/users/logout"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.responseOutcome").value("SUCCESS"))
+                .andExpect(header().string("Set-Cookie", containsString("Max-Age=0")));
+
+        verify(refreshTokenService, never()).revokeRefreshToken(any());
     }
 }

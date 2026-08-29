@@ -61,6 +61,20 @@ public class RefreshTokenService {
         return createRefreshToken(oldToken.getUser());
     }
 
+    /**
+     * Best-effort single-token revoke used on logout. A missing or already-revoked
+     * token is a no-op so that logout stays idempotent and never fails the request.
+     */
+    @Transactional
+    public void revokeRefreshToken(String token) {
+        refreshTokenRepository.findByToken(token).ifPresent(refreshToken -> {
+            if (!refreshToken.isRevoked()) {
+                refreshToken.setRevoked(true);
+                refreshTokenRepository.save(refreshToken);
+            }
+        });
+    }
+
     @Transactional
     public void cleanupExpiredTokens() {
         refreshTokenRepository.deleteExpiredTokens(Instant.now());

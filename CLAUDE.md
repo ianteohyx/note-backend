@@ -58,6 +58,7 @@ src/main/java/com/yx/note_app/
 | POST | `/api/users/signup` | SignUpService | Register new user |
 | POST | `/api/users/login` | LogInService | Login, returns JWT in body + refresh token as HttpOnly cookie |
 | POST | `/api/users/refresh` | RefreshTokenRequestService | Reads `refreshToken` cookie, rotates it (new cookie), returns new JWT. No request body. |
+| POST | `/api/users/logout` | (controller → RefreshTokenService) | Reads `refreshToken` cookie, revokes that token, and returns a `Set-Cookie` that clears it (`Max-Age=0`). No request body. Idempotent — always 200 `SUCCESS`, even with a missing/unknown/already-revoked cookie. |
 
 ### Protected (requires `Authorization: Bearer <token>`)
 | Method | Path | Service | Description |
@@ -240,7 +241,8 @@ Always throw these instead of returning error codes manually from services.
 - **Delivery**: sent to the client only as an **HttpOnly cookie** named `refreshToken` (never in the response body). Built by `RefreshTokenCookieFactory` (in `security/`).
   - `Set-Cookie` on `POST /api/users/login` and `POST /api/users/refresh` responses
   - `POST /api/users/refresh` takes **no body** — it reads the `refreshToken` cookie via `@CookieValue`; missing/blank cookie → `InvalidRefreshTokenException.invalid()` (401)
-  - Cookie attributes: `HttpOnly`, `Secure` (configurable), `SameSite` (configurable), `Path` (configurable, default `/api/users`), `Max-Age` = refresh token TTL
+  - `POST /api/users/logout` takes **no body** — reads the `refreshToken` cookie, calls `RefreshTokenService.revokeRefreshToken(token)` (best-effort single-token revoke, no-op if missing/unknown/already-revoked), and responds with `RefreshTokenCookieFactory.clear()` (`Max-Age=0`, same attributes) to evict the cookie. Always 200 `SUCCESS`.
+  - Cookie attributes: `HttpOnly`, `Secure` (configurable), `SameSite` (configurable), `Path` (configurable, default `/api/users`), `Max-Age` = refresh token TTL (or `0` on logout)
   - **dev profile**: `Secure=false`, `SameSite=Lax` — works over `http://localhost` and for a same-site frontend (`localhost:5173` → `localhost:8080`), and Postman sends it automatically via its cookie jar
   - **prod profile**: `Secure=true`, `SameSite=None` — required when the deployed frontend is on a different site; also needs CORS `allowCredentials=true` (already set) and the frontend using `credentials: 'include'` / `withCredentials: true`
 - **Token rotation**: on each refresh, old token is revoked and a new one is issued (new cookie)

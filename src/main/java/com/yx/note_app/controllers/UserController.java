@@ -2,12 +2,14 @@ package com.yx.note_app.controllers;
 
 import com.yx.note_app.exception.InvalidRefreshTokenException;
 import com.yx.note_app.security.RefreshTokenCookieFactory;
+import com.yx.note_app.security.RefreshTokenService;
 import com.yx.note_app.services.service.LogInService;
 import com.yx.note_app.services.service.RefreshTokenRequestService;
 import com.yx.note_app.services.service.SignUpService;
 import com.yx.note_app.services.reponse.ApiResponse;
 import com.yx.note_app.services.reponse.ErrorResponse;
 import com.yx.note_app.services.reponse.LoginResponse;
+import com.yx.note_app.services.reponse.ResponseDirectory;
 import com.yx.note_app.services.request.LoginRequest;
 import com.yx.note_app.services.request.RefreshTokenRequest;
 import com.yx.note_app.services.request.SignUpRequest;
@@ -37,6 +39,9 @@ public class UserController {
 
     @Autowired
     private RefreshTokenRequestService refreshTokenRequestService;
+
+    @Autowired
+    private RefreshTokenService refreshTokenService;
 
     @Autowired
     private RefreshTokenCookieFactory refreshTokenCookieFactory;
@@ -93,6 +98,24 @@ public class UserController {
         refreshTokenRequest.setRefreshToken(refreshTokenCookie);
         LoginResponse response = refreshTokenRequestService.execute(refreshTokenRequest);
         return buildAuthResponse(response);
+    }
+
+    @Operation(summary = "Log out: revoke the refresh token and clear its cookie")
+    @ApiResponses({
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Logged out; refresh token revoked and cookie cleared",
+            content = @Content(schema = @Schema(implementation = ApiResponse.class)))
+    })
+    @PostMapping("/logout")
+    public ResponseEntity<ApiResponse> logout(
+            @CookieValue(name = RefreshTokenCookieFactory.COOKIE_NAME, required = false) String refreshTokenCookie) {
+        if (StringUtils.hasText(refreshTokenCookie)) {
+            refreshTokenService.revokeRefreshToken(refreshTokenCookie);
+        }
+        // Always clear the cookie and return 200 — logout is idempotent and must not
+        // fail even if the cookie is missing, unknown, or already revoked.
+        return ResponseEntity.ok()
+            .header(HttpHeaders.SET_COOKIE, refreshTokenCookieFactory.clear().toString())
+            .body(ResponseDirectory.buildSuccessResponse());
     }
 
     /**

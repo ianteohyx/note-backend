@@ -38,4 +38,18 @@ public class RefreshTokenCookieFactory {
                 .maxAge(Duration.ofMillis(refreshExpirationMs))
                 .build();
     }
+
+    /**
+     * An already-expired, empty cookie with the same attributes as {@link #create(String)},
+     * used on logout to make the browser drop the stored refresh token.
+     */
+    public ResponseCookie clear() {
+        return ResponseCookie.from(COOKIE_NAME, "")
+                .httpOnly(true)
+                .secure(secure)
+                .path(cookiePath)
+                .sameSite(sameSite)
+                .maxAge(0)
+                .build();
+    }
 }
