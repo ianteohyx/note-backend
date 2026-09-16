@@ -153,22 +153,17 @@ public class ShareNoteController {
         return ResponseEntity.status(response.getResponseOutcome().getHttpStatus()).body(response);
     }
 
-    @Operation(summary = "Change a user's permission on a shared note (owner only)")
+    @Operation(summary = "Change permissions for one or more shared notes in a single request (owner only)")
     @ApiResponses({
-        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Permission updated",
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Permissions updated",
             content = @Content(schema = @Schema(implementation = ApiResponse.class))),
-        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "Not the owner",
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "Not the owner of one of the notes",
             content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
-        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "Note not found or not shared to user",
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "A note was not found or not shared to the given user",
             content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
     })
-    @PatchMapping("/note/{noteId}/user/{username}/permission")
-    public ResponseEntity<ApiResponse> updatePermission(
-            @Parameter(description = "Note ID", example = "42") @PathVariable Integer noteId,
-            @Parameter(description = "Username of the user whose permission to update", example = "jane_doe") @PathVariable String username,
-            @Valid @RequestBody UpdateShareNotePermissionRequest request) {
-        request.setNoteId(noteId);
-        request.setSharedToUsername(username);
+    @PatchMapping("/permissions")
+    public ResponseEntity<ApiResponse> updatePermissions(@Valid @RequestBody UpdateShareNotePermissionRequest request) {
         ApiResponse response = updateShareNotePermissionService.execute(request);
         return ResponseEntity.status(response.getResponseOutcome().getHttpStatus()).body(response);
     }

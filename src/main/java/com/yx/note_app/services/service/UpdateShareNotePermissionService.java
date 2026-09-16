@@ -9,6 +9,7 @@ import com.yx.note_app.repositories.ShareNoteRepository;
 import com.yx.note_app.repositories.UserRepository;
 import com.yx.note_app.services.reponse.ApiResponse;
 import com.yx.note_app.services.reponse.ResponseDirectory;
+import com.yx.note_app.services.request.UpdateShareNotePermissionItem;
 import com.yx.note_app.services.request.UpdateShareNotePermissionRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -35,27 +36,33 @@ public class UpdateShareNotePermissionService extends Service<UpdateShareNotePer
     @Override
     @Transactional
     public ApiResponse doService(UpdateShareNotePermissionRequest request) {
-        Optional<User> user = userRepository.findByUsername(request.getSharedToUsername());
+        for (UpdateShareNotePermissionItem item : request.getUpdates()) {
+            applyUpdate(item);
+        }
+        return ResponseDirectory.buildSuccessResponse();
+    }
 
-        if(user.isEmpty()){
-            throw ResourceNotFoundException.userNotFound(request.getSharedToUsername());
+    private void applyUpdate(UpdateShareNotePermissionItem item) {
+        Optional<User> user = userRepository.findByUsername(item.getSharedToUsername());
+
+        if (user.isEmpty()) {
+            throw ResourceNotFoundException.userNotFound(item.getSharedToUsername());
         }
 
-        Note note = noteRepository.findById((int)request.getNoteId());
-        if (Objects.isNull(note)){
-            throw ResourceNotFoundException.noteNotFound(request.getNoteId());
+        Note note = noteRepository.findById((int) item.getNoteId());
+        if (Objects.isNull(note)) {
+            throw ResourceNotFoundException.noteNotFound(item.getNoteId());
         }
 
         assertIsOwner(note);
 
         SharedNote sharedNote = shareNoteRepository.findByNoteIdAndSharedToUserId(note.getId(), user.get().getId());
 
-        if (Objects.isNull(sharedNote)){
+        if (Objects.isNull(sharedNote)) {
             throw ResourceNotFoundException.noteNotSharedToUser(note.getId(), user.get().getUsername());
         }
 
-        shareNoteRepository.updateSharedNotePermission(sharedNote.getId(), request.getPermission());
-        logger.info("User {} updated permission on shared note {} to {}", getUserUsingTheService().getUsername(), sharedNote.getId(), request.getPermission());
-        return ResponseDirectory.buildSuccessResponse();
+        shareNoteRepository.updateSharedNotePermission(sharedNote.getId(), item.getPermission());
+        logger.info("User {} updated permission on shared note {} to {}", getUserUsingTheService().getUsername(), sharedNote.getId(), item.getPermission());
     }
 }

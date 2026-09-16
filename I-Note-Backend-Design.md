@@ -261,7 +261,7 @@ Beyond authentication (who are you), the app enforces authorization (what can yo
 | PATCH | `/api/shares/{id}` | Recipient with WRITE permission only |
 | GET | `/api/shares/note/{noteId}/users` | Note owner only |
 | DELETE | `/api/shares/note/{noteId}/user/{username}` | Note owner only |
-| PATCH | `/api/shares/note/{noteId}/user/{username}/permission` | Note owner only |
+| PATCH | `/api/shares/permissions` | Note owner only (batch update of multiple note/user permissions) |
 
 ### Pagination
 

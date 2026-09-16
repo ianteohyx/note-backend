@@ -1,39 +1,22 @@
 package com.yx.note_app.services.request;
 
-import com.yx.note_app.enums.Permission;
 import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotEmpty;
 
-public class UpdateShareNotePermissionRequest extends ApiRequest{
-    @Schema(hidden = true)
-    private String sharedToUsername;
+import java.util.List;
 
-    @Schema(hidden = true)
-    private Integer noteId;
+public class UpdateShareNotePermissionRequest extends ApiRequest {
+    @Schema(description = "List of note/user permission updates to apply in one request")
+    @NotEmpty(message = "At least one permission update is required")
+    @Valid
+    private List<UpdateShareNotePermissionItem> updates;
 
-    @Schema(description = "New permission to assign", example = "WRITE")
-    private Permission permission;
-
-    public String getSharedToUsername() {
-        return sharedToUsername;
+    public List<UpdateShareNotePermissionItem> getUpdates() {
+        return updates;
     }
 
-    public void setSharedToUsername(String shareToUsername) {
-        this.sharedToUsername = shareToUsername;
-    }
-
-    public Integer getNoteId() {
-        return noteId;
-    }
-
-    public void setNoteId(Integer noteId) {
-        this.noteId = noteId;
-    }
-
-    public Permission getPermission() {
-        return permission;
-    }
-
-    public void setPermission(Permission permission) {
-        this.permission = permission;
+    public void setUpdates(List<UpdateShareNotePermissionItem> updates) {
+        this.updates = updates;
     }
 }
