@@ -1,17 +1,18 @@
 package com.yx.note_app.services.reponse;
 
+import com.yx.note_app.dto.SharedUserDto;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.util.List;
 
 public class GetSharedToUsersResponse extends ApiResponse{
-    @Schema(description = "Usernames of all users the note is shared with", example = "[\"jane_doe\", \"bob123\"]")
-    private List<String> usernames;
+    @Schema(description = "Users the note is shared with, along with their permission")
+    private List<SharedUserDto> sharedUsers;
 
-    public List<String> getUsername() {
-        return usernames;
+    public List<SharedUserDto> getSharedUsers() {
+        return sharedUsers;
     }
 
-    public void setUsernames(List<String> usernames) {
-        this.usernames = usernames;
+    public void setSharedUsers(List<SharedUserDto> sharedUsers) {
+        this.sharedUsers = sharedUsers;
     }
 }

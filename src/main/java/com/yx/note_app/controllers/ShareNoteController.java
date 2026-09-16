@@ -118,7 +118,7 @@ public class ShareNoteController {
 
     @Operation(summary = "List all users a note is shared with (owner only)")
     @ApiResponses({
-        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "List of usernames",
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "List of usernames with their permission",
             content = @Content(schema = @Schema(implementation = GetSharedToUsersResponse.class))),
         @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "Not the owner",
             content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
