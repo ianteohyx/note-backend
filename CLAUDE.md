@@ -167,10 +167,11 @@ All responses extend `ApiResponse` which carries a `ResponseOutcome`.
 | `GetSingleNoteResponse` | `+ noteDto` |
 | `GetAllSharedToMeResponse` | `+ sharedNotes: List<SharedNoteDto>` |
 | `GetSingleSharedNoteResponse` | `+ sharedNote` |
-| `GetSharedToUsersResponse` | `+ usernames: List<String>` |
+| `GetSharedToUsersResponse` | `+ sharedUsers: List<SharedUserDto>` |
 
 **NoteDto**: `id, title, content, authorName, dateCreated, dateModified`
 **SharedNoteDto**: `id, note: NoteDto, permission`
+**SharedUserDto**: `username, permission`
 
 Use `ResponseDirectory.buildSuccessResponse()` / `buildFailResponse(ResponseOutcome)` for constructing responses.
 
