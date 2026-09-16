@@ -74,7 +74,7 @@ src/main/java/com/yx/note_app/
 | PATCH | `/api/shares/{id}` | EditSharedNoteService | Edit shared note (WRITE permission only) |
 | GET | `/api/shares/note/{noteId}/users` | GetSharedToUsersService | List users note is shared to (owner only) |
 | DELETE | `/api/shares/note/{noteId}/user/{username}` | UnshareNoteService | Revoke access (owner only) |
-| PATCH | `/api/shares/note/{noteId}/user/{username}/permission` | UpdateShareNotePermissionService | Change READ/WRITE permission (owner only) |
+| PATCH | `/api/shares/permissions` | UpdateShareNotePermissionService | Batch-change READ/WRITE permission for one or more note/user pairs (owner only, all-or-nothing) |
 
 ---
 
