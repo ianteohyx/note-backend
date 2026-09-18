@@ -28,7 +28,7 @@ public class GetAllSharedToMeService extends Service<GetAllSharedToMeRequest, Ge
     @Override
     @Transactional(readOnly = true)
     public GetAllSharedToMeResponse doService(GetAllSharedToMeRequest request) {
-        PageRequest pageable = PageRequest.of(request.getPage(), request.getSize(), Sort.by("id").descending());
+        PageRequest pageable = PageRequest.of(request.getPage(), request.getSize(), Sort.by("note.dateModified").descending());
         Page<SharedNote> sharedNotePage = shareNoteRepository.findBySharedToUser(getUserUsingTheService(), pageable);
         logger.info("User {} retrieved shared notes page {}/{}", getUserUsingTheService().getUsername(), request.getPage(), sharedNotePage.getTotalPages());
         return buildResponse(sharedNotePage, request);

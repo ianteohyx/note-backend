@@ -69,7 +69,7 @@ src/main/java/com/yx/note_app/
 | PATCH | `/api/notes/{id}` | UpdateNoteService | Update note title/content |
 | DELETE | `/api/notes/{id}` | DeleteNoteService | Delete note (cascades shared records) |
 | POST | `/api/shares` | ShareNoteToOthersService | Share note with user (201) |
-| GET | `/api/shares/received` | GetAllSharedToMeService | Get all notes shared to me |
+| GET | `/api/shares/received` | GetAllSharedToMeService | Get all notes shared to me, sorted by the note's `dateModified` descending (latest-edited first — not by share-creation order) |
 | GET | `/api/shares/{id}` | GetSingleSharedNoteService | Get single shared note (recipient only) |
 | PATCH | `/api/shares/{id}` | EditSharedNoteService | Edit shared note (WRITE permission only) |
 | GET | `/api/shares/note/{noteId}/users` | GetSharedToUsersService | List users note is shared to (owner only) |
