@@ -133,22 +133,17 @@ public class ShareNoteController {
         return ResponseEntity.status(response.getResponseOutcome().getHttpStatus()).body(response);
     }
 
-    @Operation(summary = "Revoke a user's access to a note (owner only)")
+    @Operation(summary = "Revoke one or more users' access to notes in a single request (owner only, all-or-nothing)")
     @ApiResponses({
         @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Access revoked",
             content = @Content(schema = @Schema(implementation = ApiResponse.class))),
-        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "Not the owner",
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "Not the owner of one of the notes",
             content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
-        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "Note or user not found / note not shared to user",
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "A note or user was not found, or a note was not shared to the given user",
             content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
     })
-    @DeleteMapping("/note/{noteId}/user/{username}")
-    public ResponseEntity<ApiResponse> unshareNote(
-            @Parameter(description = "Note ID", example = "42") @PathVariable Integer noteId,
-            @Parameter(description = "Username of the user to revoke access from", example = "jane_doe") @PathVariable String username) {
-        UnshareNoteRequest request = new UnshareNoteRequest();
-        request.setNoteId(noteId);
-        request.setSharedToUsername(username);
+    @DeleteMapping("/unshare")
+    public ResponseEntity<ApiResponse> unshareNote(@Valid @RequestBody UnshareNoteRequest request) {
         ApiResponse response = unshareNoteService.execute(request);
         return ResponseEntity.status(response.getResponseOutcome().getHttpStatus()).body(response);
     }
