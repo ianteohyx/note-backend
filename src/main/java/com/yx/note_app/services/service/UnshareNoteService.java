@@ -9,6 +9,7 @@ import com.yx.note_app.repositories.ShareNoteRepository;
 import com.yx.note_app.repositories.UserRepository;
 import com.yx.note_app.services.reponse.ApiResponse;
 import com.yx.note_app.services.reponse.ResponseDirectory;
+import com.yx.note_app.services.request.UnshareNoteItem;
 import com.yx.note_app.services.request.UnshareNoteRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -35,27 +36,33 @@ public class UnshareNoteService extends Service<UnshareNoteRequest, ApiResponse>
     @Override
     @Transactional
     public ApiResponse doService(UnshareNoteRequest request) {
-        Optional<User> user = userRepository.findByUsername(request.getSharedToUsername());
+        for (UnshareNoteItem item : request.getUnshares()) {
+            applyUnshare(item);
+        }
+        return ResponseDirectory.buildSuccessResponse();
+    }
 
-        if(user.isEmpty()){
-            throw ResourceNotFoundException.userNotFound(request.getSharedToUsername());
+    private void applyUnshare(UnshareNoteItem item) {
+        Optional<User> user = userRepository.findByUsername(item.getSharedToUsername());
+
+        if (user.isEmpty()) {
+            throw ResourceNotFoundException.userNotFound(item.getSharedToUsername());
         }
 
-        Note note = noteRepository.findById((int)request.getNoteId());
-        if (Objects.isNull(note)){
-            throw ResourceNotFoundException.noteNotFound(request.getNoteId());
+        Note note = noteRepository.findById((int) item.getNoteId());
+        if (Objects.isNull(note)) {
+            throw ResourceNotFoundException.noteNotFound(item.getNoteId());
         }
 
         assertIsOwner(note);
 
         SharedNote sharedNote = shareNoteRepository.findByNoteIdAndSharedToUserId(note.getId(), user.get().getId());
 
-        if (Objects.isNull(sharedNote)){
+        if (Objects.isNull(sharedNote)) {
             throw ResourceNotFoundException.noteNotSharedToUser(note.getId(), user.get().getUsername());
         }
 
         shareNoteRepository.deleteById(sharedNote.getId());
         logger.info("User {} unshared note {} from user {}", getUserUsingTheService().getUsername(), note.getId(), user.get().getUsername());
-        return ResponseDirectory.buildSuccessResponse();
     }
 }
