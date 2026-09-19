@@ -73,10 +73,10 @@ com.yx.note_app/
 ├── exception/     - Custom exceptions + global handler
 ├── models/        - JPA entities
 ├── repositories/  - DB queries
-├── security/      - JWT filter, rate limiting filter, auth service
+├── security/      - JWT filter, rate limiting filter, refresh token service, refresh cookie factory, auth service
 ├── services/
 │   ├── request/   - Input POJOs per service
-│   ├── response/  - Output POJOs per service
+│   ├── reponse/   - Output POJOs per service (sic — the package is spelled this way in the code)
 │   └── service/   - Business logic (one class per operation)
 └── utils/         - JWT utils, model-to-DTO mappers
 ```
@@ -95,6 +95,8 @@ User (1) ──────< SharedNote (many)
 Note (1) ──────< SharedNote (many)
 User (1) ──────< RefreshToken (many)
 ```
+
+Deleting a note cascades to its shared records — both in JPA (`cascade = ALL` on `Note.sharedNotes`) and in the schema (`ON DELETE CASCADE` on the `sharednotes` foreign keys), so recipients never hold a dangling share.
 
 ### Tables
 
@@ -127,7 +129,7 @@ UNIQUE(note_id, shared_to_user_id)     ← prevents duplicate shares
 **refreshtokens**
 ```
 token      VARCHAR PK  (UUID)
-user_id    INT FK → users.id
+userId     INT FK → users.id
 expiryDate DATETIME
 revoked    BOOLEAN
 createdAt  DATETIME
@@ -152,7 +154,8 @@ All `@ManyToOne` relations are `FetchType.LAZY` — nothing is loaded until expl
    → validate credentials (BCrypt password check)
    → generate JWT (15 min expiry)
    → generate Refresh Token (7 days, stored in DB)
-   → return both to client
+   → JWT returned in the response body
+   → refresh token returned as an HttpOnly Set-Cookie (never in the body)
 
 2. Every protected request
    → client sends: Authorization: Bearer <JWT>
@@ -160,12 +163,19 @@ All `@ManyToOne` relations are `FetchType.LAZY` — nothing is loaded until expl
    → sets SecurityContext with authenticated user
    → request proceeds to controller
 
-3. POST /api/users/refresh (when JWT expires)
-   → client sends refresh token
+3. POST /api/users/refresh (when JWT expires, or on app start after a page reload)
+   → no body — the browser sends the refreshToken cookie automatically
+   → 401 if the cookie is missing
    → validate: not expired, not revoked, exists in DB
    → revoke old token, issue new refresh token (rotation)
    → issue new JWT
-   → return both
+   → new JWT in the body, rotated refresh token in a new Set-Cookie
+
+4. POST /api/users/logout
+   → no body — reads the refreshToken cookie
+   → revokes that refresh token in the DB (if it exists and isn't already revoked)
+   → responds with an expired cookie (Max-Age=0) so the browser drops it
+   → always 200 — idempotent, never fails on a missing/unknown/already-revoked token
 ```
 
 ### JWT
@@ -174,6 +184,20 @@ All `@ManyToOne` relations are `FetchType.LAZY` — nothing is loaded until expl
 - Expiry: **15 minutes** — short-lived intentionally, limits damage if stolen
 - Signing key: `${JWT_SECRET}` — Base64-encoded, stored as env var (never in code)
 - Stateless — server doesn't store JWTs, validated by signature only
+
+### Refresh Token Delivery — HttpOnly Cookie
+
+The refresh token is the long-lived credential (7 days), so it is delivered where JavaScript can't read it. `RefreshTokenCookieFactory` builds a `Set-Cookie` with:
+
+| Attribute | Value | Why |
+|-----------|-------|-----|
+| `HttpOnly` | always | Script can't read it, so an XSS payload can't exfiltrate a 7-day credential |
+| `Path` | `/api/users` | Only the refresh/logout endpoints ever receive the cookie — it isn't attached to note or share requests |
+| `Max-Age` | 7 days | Matches the DB expiry (`jwt.refresh-expiration-ms`) |
+| `Secure` | `false` in dev, `true` in prod | No HTTPS locally; required in prod |
+| `SameSite` | `Lax` in dev, `None` in prod | Prod frontend is cross-site to the API, so the cookie must be sent cross-site; dev `localhost:5173` → `localhost:8080` is same-site, so `Lax` works |
+
+`LoginResponse.refreshToken` is `@JsonIgnore` — the service hands the token to the controller, and the controller moves it into the cookie, so it can never be serialized into a response body by accident. Path, `Secure` and `SameSite` are all overridable via env vars (see [Configuration](#configuration--environment)); if the frontend and API ever share a site, `SameSite=Lax` is the stronger choice.
 
 ### Refresh Token Security — Token Rotation + Revoke-All
 
@@ -191,6 +215,8 @@ if (refreshToken.isRevoked()) {
 ```
 
 The `@Transactional(noRollbackFor = InvalidRefreshTokenException.class)` ensures the revoke-all write **commits to the DB even though an exception is thrown** — critical for this security measure to actually work.
+
+**Logout:** `POST /api/users/logout` revokes the presented refresh token and clears the cookie. Without this, the still-valid cookie would silently re-authenticate the user on the next page load, so "logout" would only be cosmetic.
 
 **Cleanup:** Expired tokens are purged daily at 3 AM via `@Scheduled` task.
 
@@ -220,9 +246,17 @@ Filters execute in this order on every request:
 
 ### CORS
 
-- Configured per environment — `http://localhost:3000` in dev, explicit `${CORS_ALLOWED_ORIGINS}` in prod
-- Only the known frontend origin can make credentialed cross-origin requests
-- Credentials: `true` (required for cookie/auth header support)
+- Configured per environment — `http://localhost:5173` (the Vite dev server) in dev, explicit `${CORS_ALLOWED_ORIGINS}` in prod
+- Only the known frontend origin can make credentialed cross-origin requests — no wildcard
+- Credentials: `true` — required so the browser will send the refresh-token cookie on cross-origin `/refresh` and `/logout` calls (and it is why a wildcard origin isn't allowed)
+
+### CSRF
+
+CSRF protection is disabled (`csrf.disable()`) and the app is stateless (`SessionCreationPolicy.STATELESS`). That's sound here because:
+
+- Note and share endpoints authenticate with the `Authorization: Bearer` header, which a forged cross-site request cannot attach — there's no ambient credential for an attacker to ride
+- The one ambient credential, the refresh cookie, is `HttpOnly`, scoped to `Path=/api/users`, and only honoured by `/refresh` and `/logout`
+- A forged call to those two can't read the new JWT (CORS blocks the response) and can't touch notes; the worst it can do is revoke or rotate the victim's own refresh token
 
 ### Authorization — Entity-Level Ownership
 
@@ -249,7 +283,8 @@ Beyond authentication (who are you), the app enforces authorization (what can yo
 |--------|------|-------------|
 | POST | `/api/users/signup` | Public |
 | POST | `/api/users/login` | Public |
-| POST | `/api/users/refresh` | Public |
+| POST | `/api/users/refresh` | Public (needs the `refreshToken` cookie; no body) |
+| POST | `/api/users/logout` | Public (revokes the cookie's refresh token; idempotent, always 200) |
 | POST | `/api/notes` | Authenticated |
 | GET | `/api/notes` | Authenticated (own notes, paginated) |
 | GET | `/api/notes/{id}` | Owner only |
@@ -260,12 +295,20 @@ Beyond authentication (who are you), the app enforces authorization (what can yo
 | GET | `/api/shares/{id}` | Recipient only |
 | PATCH | `/api/shares/{id}` | Recipient with WRITE permission only |
 | GET | `/api/shares/note/{noteId}/users` | Note owner only |
-| DELETE | `/api/shares/note/{noteId}/user/{username}` | Note owner only |
-| PATCH | `/api/shares/permissions` | Note owner only (batch update of multiple note/user permissions) |
+| DELETE | `/api/shares/unshare` | Note owner only (batch revoke — body `{ unshares: [{ noteId, sharedToUsername }] }`) |
+| PATCH | `/api/shares/permissions` | Note owner only (batch update — body `{ updates: [{ noteId, sharedToUsername, permission }] }`) |
+
+`GET /api/shares/note/{noteId}/users` returns each recipient with their permission (`sharedUsers: [{ username, permission }]`), so a client can render and edit permissions from a single call.
+
+### Batch Endpoints
+
+Unshare and permission-change take a **list** of items rather than one path-variable per user/note. A client editing several recipients at once makes one request instead of N, and the whole batch runs in a single transaction (see [Transaction Management](#transaction-management)) — if any item fails validation (unknown user, not the owner, not shared), nothing is applied.
 
 ### Pagination
 
-List endpoints (`GET /api/notes`, `GET /api/shares/received`) are paginated using Spring Data's `Pageable`. Response includes `page`, `size`, `totalElements`, `totalPages` — clients can navigate large datasets without loading everything.
+List endpoints (`GET /api/notes`, `GET /api/shares/received`) are paginated using Spring Data's `Pageable` (`page` 0-indexed, `size` default 10). Response includes `page`, `size`, `totalElements`, `totalPages` — clients can navigate large datasets without loading everything.
+
+Both lists are sorted by the note's `dateModified` descending (latest-edited first). `GET /api/shares/received` sorts on `note.dateModified`, not the share record's own id — sorting by share id would order by when the note was *shared*, not when it was last edited.
 
 ### API Documentation
 
@@ -294,6 +337,8 @@ Page<SharedNote> findBySharedToUser(@Param("user") User user, Pageable pageable)
 ```
 
 **Why `JOIN FETCH` is safe here:** All fetched associations (`author`, `note`, `sharedToUser`) are `@ManyToOne` — not collections. `JOIN FETCH` on collections with pagination causes Hibernate to load everything into memory first, which is a different problem. `@ManyToOne` + `JOIN FETCH` + pagination is always safe.
+
+The one query that does `LEFT JOIN FETCH` a *collection* is `findByIdWithSharedUsers` (a note with its shares and their users, for the "shared with" list). It's safe because it loads a single note and isn't paginated — the in-memory-pagination problem only bites when a collection fetch is combined with `Pageable`.
 
 **Result:** List endpoints go from O(N) queries to O(1) regardless of page size.
 
@@ -330,10 +375,15 @@ All `@ManyToOne` relations use `FetchType.LAZY`. Data is only fetched when expli
 - Tells Hibernate to skip dirty checking (no need to track entity state for flushing)
 - Can allow DB-level read optimizations
 
+**Batch services — `UnshareNoteService`, `UpdateShareNotePermissionService`** → `@Transactional`
+- The service loops over every item in the request inside one transaction
+- A failure on any item (unknown user, not the owner, note not shared) throws and rolls back the whole batch — all-or-nothing, never a half-applied edit
+
 **Special case — RefreshTokenRequestService** → `@Transactional(noRollbackFor = InvalidRefreshTokenException.class)`
 - The revoke-all-on-stolen-token security measure fires a write then throws an exception
 - Without `noRollbackFor`, Spring would roll back the revoke — defeating the security purpose
 - This annotation ensures the revoke commits even when the exception propagates
+- `RefreshTokenService.validateRefreshToken` carries the same annotation. Both are needed: the inner method joins the outer transaction, and without its own `noRollbackFor` the inner proxy would mark the shared transaction rollback-only as the exception passes through it
 
 ---
 
@@ -350,11 +400,19 @@ All custom exceptions extend `ApiException` which carries a `ResponseOutcome`:
 ```
 ApiException
 ├── ResourceNotFoundException  (404) — note/user/sharedNote not found
+│                                (`noteNotSharedToUser` uses `NOTE_NOT_SHARED`, which maps to 403)
 ├── UnauthorizedException      (403) — not owner, no write permission
 ├── DuplicateResourceException (409) — username exists, note already shared
 ├── InvalidCredentialsException (401) — wrong password
-└── InvalidRefreshTokenException (401) — expired/invalid/revoked token
+└── InvalidRefreshTokenException (401) — missing/expired/invalid/revoked token
 ```
+
+The handler also covers two cases that aren't `ApiException`s:
+
+- **Bean validation failures** (`@Valid` on request bodies) → `400` with `VALIDATION_ERROR` and a `fieldErrors` map of field → message, so clients can put each error next to its input
+- **Anything unexpected** → logged with the stack trace, returned as a generic `500` `PROCESS_FAIL` with no internal detail leaked
+
+A request with a missing/invalid/expired JWT never reaches the handler — Spring Security's authentication entry point answers `401` with `TOKEN_INVALID` directly.
 
 Each exception has named static factory methods:
 ```java
@@ -367,7 +425,7 @@ This makes throw sites readable and consistent — no raw strings or magic numbe
 
 ### ResponseOutcome Enum
 
-Every API response carries a `ResponseOutcome` value with `(success, code, description, httpStatus)`. Controllers read the HTTP status directly from the outcome — no hardcoded status codes in controller logic.
+Every API response carries a `ResponseOutcome` value with `(success, code, description, httpStatus)`. Controllers read the HTTP status directly from the outcome — the only hardcoded status is `201 Created` for successful create endpoints (signup, create note, share note).
 
 ---
 
@@ -383,7 +441,9 @@ Spring profile system separates dev and prod config cleanly:
 | `ddl-auto` | `update` (auto-alter schema) | `validate` (crash if mismatch) |
 | App log level | DEBUG | INFO |
 | Swagger UI | Enabled | **Disabled** |
-| CORS origin | `http://localhost:3000` | `${CORS_ALLOWED_ORIGINS}` |
+| CORS origin | `http://localhost:5173` | `${CORS_ALLOWED_ORIGINS}` |
+| Refresh cookie `Secure` | `false` (no HTTPS locally) | `true` (`${REFRESH_COOKIE_SECURE}`) |
+| Refresh cookie `SameSite` | `Lax` | `None` (`${REFRESH_COOKIE_SAME_SITE}`) |
 
 Active profile set by `SPRING_PROFILES_ACTIVE` env var — `dev` in `.env` locally, `prod` on the server.
 
@@ -400,6 +460,10 @@ All secrets live in environment variables — never hardcoded, never committed t
 | `JWT_SECRET` | Base64-encoded signing key for JWT |
 | `SPRING_PROFILES_ACTIVE` | `dev` or `prod` |
 | `CORS_ALLOWED_ORIGINS` | Frontend URL (prod only) |
+| `REFRESH_TOKEN_EXPIRATION_MS` | Optional — refresh token / cookie lifetime, default 7 days |
+| `REFRESH_COOKIE_PATH` | Optional — cookie path, default `/api/users` |
+| `REFRESH_COOKIE_SECURE` | Optional, prod — default `true` |
+| `REFRESH_COOKIE_SAME_SITE` | Optional, prod — default `None` |
 
 Locally loaded from `.env` via `spring-dotenv`. On AWS, set as system environment variables on the EC2 instance.
 
@@ -449,7 +513,11 @@ RDS MySQL Instance (ap-southeast-2)
 |----------|------|-----|
 | Generic `Service<Req, Res>` | All services share a typed base class | Single responsibility, type safety, consistent pattern |
 | JWT (15 min) + Refresh Token (7 days) | Short-lived access + long-lived refresh | JWT can't be revoked (stateless), so keep it short. Refresh token is in DB so it can be revoked |
+| Refresh token in an HttpOnly cookie | Sent via `Set-Cookie` (path `/api/users`), never in the JSON body | JavaScript can't read the long-lived credential, so XSS can't steal it. `@JsonIgnore` on the response field prevents leaking it into a body |
 | Token rotation + revoke-all on reuse | Each refresh token is single-use; stolen token triggers full revocation | Industry-standard defence against refresh token theft |
+| Server-side logout | `/logout` revokes the refresh token and expires the cookie | Otherwise the surviving cookie would silently re-authenticate the user — logout would be cosmetic |
+| CSRF disabled, stateless | Bearer header for data endpoints; cookie scoped to `/api/users` | No ambient credential on note/share endpoints, so nothing for a forged request to ride |
+| Batch unshare / permission endpoints | List-bodied requests, one transaction each | One round-trip for many edits; all-or-nothing, never half-applied |
 | `FetchType.LAZY` + `JOIN FETCH` | Lazy by default, explicit fetch in queries | Prevents accidental over-fetching; N+1 solved at query level |
 | `@Transactional` at service level | Wraps read-validate-write in one DB transaction | Atomicity — no partial writes if something fails mid-operation |
 | `GlobalExceptionHandler` | One class handles all exceptions | No try-catch noise in business logic; consistent error responses |
