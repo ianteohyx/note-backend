@@ -127,6 +127,40 @@ class RefreshTokenServiceTest {
         assertThat(newToken.isRevoked()).isFalse();
     }
 
+    @Test
+    void revokeRefreshToken_existingActiveToken_marksItRevoked() {
+        RefreshToken token = buildValidToken("logout-token");
+
+        when(refreshTokenRepository.findByToken("logout-token")).thenReturn(Optional.of(token));
+        when(refreshTokenRepository.save(any(RefreshToken.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        refreshTokenService.revokeRefreshToken("logout-token");
+
+        assertThat(token.isRevoked()).isTrue();
+        verify(refreshTokenRepository).save(token);
+    }
+
+    @Test
+    void revokeRefreshToken_unknownToken_isNoOp() {
+        when(refreshTokenRepository.findByToken("ghost-token")).thenReturn(Optional.empty());
+
+        refreshTokenService.revokeRefreshToken("ghost-token");
+
+        verify(refreshTokenRepository, never()).save(any());
+    }
+
+    @Test
+    void revokeRefreshToken_alreadyRevokedToken_doesNotResave() {
+        RefreshToken token = buildValidToken("stale-token");
+        token.setRevoked(true);
+
+        when(refreshTokenRepository.findByToken("stale-token")).thenReturn(Optional.of(token));
+
+        refreshTokenService.revokeRefreshToken("stale-token");
+
+        verify(refreshTokenRepository, never()).save(any());
+    }
+
     private RefreshToken buildValidToken(String tokenValue) {
         RefreshToken token = new RefreshToken();
         token.setToken(tokenValue);

@@ -1,11 +1,15 @@
 package com.yx.note_app.controllers;
 
+import com.yx.note_app.exception.InvalidRefreshTokenException;
+import com.yx.note_app.security.RefreshTokenCookieFactory;
+import com.yx.note_app.security.RefreshTokenService;
 import com.yx.note_app.services.service.LogInService;
 import com.yx.note_app.services.service.RefreshTokenRequestService;
 import com.yx.note_app.services.service.SignUpService;
 import com.yx.note_app.services.reponse.ApiResponse;
 import com.yx.note_app.services.reponse.ErrorResponse;
 import com.yx.note_app.services.reponse.LoginResponse;
+import com.yx.note_app.services.reponse.ResponseDirectory;
 import com.yx.note_app.services.request.LoginRequest;
 import com.yx.note_app.services.request.RefreshTokenRequest;
 import com.yx.note_app.services.request.SignUpRequest;
@@ -16,8 +20,10 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -33,6 +39,12 @@ public class UserController {
 
     @Autowired
     private RefreshTokenRequestService refreshTokenRequestService;
+
+    @Autowired
+    private RefreshTokenService refreshTokenService;
+
+    @Autowired
+    private RefreshTokenCookieFactory refreshTokenCookieFactory;
 
     @Operation(summary = "Register a new user")
     @ApiResponses({
@@ -52,9 +64,9 @@ public class UserController {
         return ResponseEntity.status(status).body(response);
     }
 
-    @Operation(summary = "Login and obtain JWT + refresh token")
+    @Operation(summary = "Login and obtain a JWT; refresh token is set as an HttpOnly cookie")
     @ApiResponses({
-        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Login successful, returns JWT and refresh token",
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Login successful; JWT in body, refresh token in Set-Cookie header",
             content = @Content(schema = @Schema(implementation = LoginResponse.class))),
         @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "Invalid credentials",
             content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
@@ -64,21 +76,59 @@ public class UserController {
     @PostMapping("/login")
     public ResponseEntity<LoginResponse> verifyUser(@Valid @RequestBody LoginRequest loginRequest) {
         LoginResponse response = logInService.execute(loginRequest);
-        return ResponseEntity.status(response.getResponseOutcome().getHttpStatus()).body(response);
+        return buildAuthResponse(response);
     }
 
-    @Operation(summary = "Rotate refresh token and get a new JWT")
+    @Operation(summary = "Rotate the refresh token cookie and get a new JWT")
     @ApiResponses({
-        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "New JWT and refresh token issued",
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "New JWT in body, rotated refresh token in Set-Cookie header",
             content = @Content(schema = @Schema(implementation = LoginResponse.class))),
-        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "Refresh token invalid, expired, or revoked",
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "Refresh token cookie missing, invalid, expired, or revoked",
             content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
         @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "429", description = "Rate limit exceeded",
             content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
     })
     @PostMapping("/refresh")
-    public ResponseEntity<LoginResponse> refreshToken(@Valid @RequestBody RefreshTokenRequest refreshTokenRequest) {
+    public ResponseEntity<LoginResponse> refreshToken(
+            @CookieValue(name = RefreshTokenCookieFactory.COOKIE_NAME, required = false) String refreshTokenCookie) {
+        if (!StringUtils.hasText(refreshTokenCookie)) {
+            throw InvalidRefreshTokenException.invalid();
+        }
+        RefreshTokenRequest refreshTokenRequest = new RefreshTokenRequest();
+        refreshTokenRequest.setRefreshToken(refreshTokenCookie);
         LoginResponse response = refreshTokenRequestService.execute(refreshTokenRequest);
-        return ResponseEntity.status(response.getResponseOutcome().getHttpStatus()).body(response);
+        return buildAuthResponse(response);
+    }
+
+    @Operation(summary = "Log out: revoke the refresh token and clear its cookie")
+    @ApiResponses({
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Logged out; refresh token revoked and cookie cleared",
+            content = @Content(schema = @Schema(implementation = ApiResponse.class)))
+    })
+    @PostMapping("/logout")
+    public ResponseEntity<ApiResponse> logout(
+            @CookieValue(name = RefreshTokenCookieFactory.COOKIE_NAME, required = false) String refreshTokenCookie) {
+        if (StringUtils.hasText(refreshTokenCookie)) {
+            refreshTokenService.revokeRefreshToken(refreshTokenCookie);
+        }
+        // Always clear the cookie and return 200 — logout is idempotent and must not
+        // fail even if the cookie is missing, unknown, or already revoked.
+        return ResponseEntity.ok()
+            .header(HttpHeaders.SET_COOKIE, refreshTokenCookieFactory.clear().toString())
+            .body(ResponseDirectory.buildSuccessResponse());
+    }
+
+    /**
+     * Puts the rotated refresh token into an HttpOnly Set-Cookie header and
+     * leaves only the JWT in the response body.
+     */
+    private ResponseEntity<LoginResponse> buildAuthResponse(LoginResponse response) {
+        ResponseEntity.BodyBuilder builder =
+            ResponseEntity.status(response.getResponseOutcome().getHttpStatus());
+        if (response.getResponseOutcome().getSuccess() && response.getRefreshToken() != null) {
+            builder.header(HttpHeaders.SET_COOKIE,
+                refreshTokenCookieFactory.create(response.getRefreshToken()).toString());
+        }
+        return builder.body(response);
     }
 }
