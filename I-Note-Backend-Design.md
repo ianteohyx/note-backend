@@ -15,7 +15,8 @@
 7. [Transaction Management](#transaction-management)
 8. [Exception Handling](#exception-handling)
 9. [Configuration & Environment](#configuration--environment)
-10. [AWS Hosting](#aws-hosting)
+10. [Containerization](#containerization)
+11. [AWS Hosting](#aws-hosting)
 
 ---
 
@@ -469,6 +470,46 @@ Locally loaded from `.env` via `spring-dotenv`. On AWS, set as system environmen
 
 ---
 
+## Containerization
+
+### Why Docker at all
+
+Companies ship containers, not raw JARs — a container bundles the app with its exact runtime (JRE, OS libraries), so "works on my machine" becomes "works anywhere Docker runs." It also decouples the server from needing Java, Maven or Node installed at all — only Docker.
+
+### Multi-stage build — why two `FROM`s, not one
+
+```dockerfile
+FROM eclipse-temurin:17-jdk-jammy AS build   # full JDK + Maven — only used to compile
+...
+RUN ./mvnw -B clean package -DskipTests
+
+FROM eclipse-temurin:17-jre-jammy AS run     # JRE only — no JDK, no Maven, no source
+COPY --from=build /app/target/*.jar app.jar
+```
+
+The build stage (JDK + Maven + source + dependency cache) is discarded in its entirety once the build finishes — only the one file named in `COPY --from=build` crosses over into the final image. Verified directly: the running container has `java` but not `javac`, and `/app` contains only `app.jar` — no `pom.xml`, no `src/`, no `.mvn/`. Result: ~320MB instead of carrying the full JDK+Maven toolchain into production.
+
+### Non-root DB user — the backend never connects as MySQL's root
+
+`docker-compose.yml`'s `db` service creates a MySQL user scoped to just `DB_NAME` via `MYSQL_USER`/`MYSQL_PASSWORD` — the backend's `DB_URL` connects as that user, never as `root`. Confirmed via `SHOW GRANTS`: the scoped user gets `ALL PRIVILEGES` on its own database only (`GRANT ALL PRIVILEGES ON i-note-db.* ...`), with none of `root`'s server-wide capabilities (`FILE`, `SHUTDOWN`, `CREATE USER`, access to every other database on the instance). If the app's credentials ever leaked, the blast radius is "this one database," not "the whole MySQL instance." (Using `root` for this isn't just worse practice — it actively breaks the container: MySQL's startup script refuses `MYSQL_USER=root` outright, since `root` already exists as the server's built-in superuser.)
+
+### Healthcheck — avoiding a startup-order race, not just "is MySQL up"
+
+```yaml
+healthcheck:
+  test: ["CMD-SHELL", "mysql -u ${DB_USERNAME} -p${DB_PASSWORD} -e 'SELECT 1' ${DB_NAME}"]
+```
+
+Deliberately not a plain `mysqladmin ping`. MySQL's own entrypoint runs a brief internal bootstrap server (to create users/run init scripts) before restarting into the real one — a plain ping can succeed against that *temporary* server, reporting `healthy` moments before a restart `app`'s `depends_on: condition: service_healthy` would then race against. Logging in as the actual app user and querying the actual app database can only succeed once the final server is up **and** that user/grant genuinely exists — the same two things `app` itself needs, so "db reports healthy" and "app's connection will work" become the same guarantee instead of two things that could silently disagree.
+
+### Separate frontend/backend repos, separate images, same network in prod
+
+Frontend (`note-frontend`) and backend are deliberately kept as two repos with two Dockerfiles, not merged into a monorepo — they share no build toolchain (Maven vs. npm), no base image, and can be released independently. In production, both images land in the same `docker-compose.prod.yml`, sharing one Docker network, so the frontend's Nginx can reverse-proxy `/api/*` to `app:8080` by service name — same-origin from the browser's perspective, so no CORS configuration is needed for that path at all. Locally, the frontend instead runs as a fully standalone container (`BACKEND_URL=http://host.docker.internal:8080`), reaching the backend through its published port rather than a shared network — deliberately avoided in daily dev, since it would otherwise require the two repos to be checked out as siblings just to build a compose file together.
+
+### Production compose — images only, never `build:`
+
+`docker-compose.prod.yml` has no `build:` anywhere — both `app` and the frontend's `web` service use `image: ${BACKEND_IMAGE}` / `${FRONTEND_IMAGE}`, pulled from a registry once CI is wired up to push them. The server never checks out source or runs Maven/npm at all; it only ever runs `docker compose pull && docker compose up -d`. `pull_policy: missing` on both services is deliberate: the explicit `pull` step is what fetches anything new, so `up` shouldn't redundantly re-pull (and risk a hard failure if the registry is briefly unreachable).
+
 ## AWS Hosting
 
 ### Infrastructure
@@ -478,7 +519,7 @@ Internet
     │
     ▼
 EC2 Instance (ap-southeast-2)
-  └── Spring Boot JAR running on JVM
+  └── Docker: app container (pulled image) + web container (frontend, pulled image)
          │
          ▼ (private VPC subnet)
 RDS MySQL Instance (ap-southeast-2)
@@ -487,7 +528,7 @@ RDS MySQL Instance (ap-southeast-2)
 
 ### EC2 — Application Server
 
-- Spring Boot app packaged as a JAR (`./mvnw clean package`)
+- `app` and `web` run as containers (`docker-compose.prod.yml`), not a bare JAR on the instance — images built in CI, pulled from a registry, never built on EC2 itself
 - Runs on EC2 in the same AWS region as RDS
 - Environment variables set on the instance — no `.env` file on server
 - `SPRING_PROFILES_ACTIVE=prod` activates production config
@@ -504,24 +545,3 @@ RDS MySQL Instance (ap-southeast-2)
 - Automated daily backups with point-in-time recovery
 - Multi-AZ failover option
 - No operational overhead managing MySQL installation, updates, disk
-
----
-
-## Key Design Decisions — Summary for Interviews
-
-| Decision | What | Why |
-|----------|------|-----|
-| Generic `Service<Req, Res>` | All services share a typed base class | Single responsibility, type safety, consistent pattern |
-| JWT (15 min) + Refresh Token (7 days) | Short-lived access + long-lived refresh | JWT can't be revoked (stateless), so keep it short. Refresh token is in DB so it can be revoked |
-| Refresh token in an HttpOnly cookie | Sent via `Set-Cookie` (path `/api/users`), never in the JSON body | JavaScript can't read the long-lived credential, so XSS can't steal it. `@JsonIgnore` on the response field prevents leaking it into a body |
-| Token rotation + revoke-all on reuse | Each refresh token is single-use; stolen token triggers full revocation | Industry-standard defence against refresh token theft |
-| Server-side logout | `/logout` revokes the refresh token and expires the cookie | Otherwise the surviving cookie would silently re-authenticate the user — logout would be cosmetic |
-| CSRF disabled, stateless | Bearer header for data endpoints; cookie scoped to `/api/users` | No ambient credential on note/share endpoints, so nothing for a forged request to ride |
-| Batch unshare / permission endpoints | List-bodied requests, one transaction each | One round-trip for many edits; all-or-nothing, never half-applied |
-| `FetchType.LAZY` + `JOIN FETCH` | Lazy by default, explicit fetch in queries | Prevents accidental over-fetching; N+1 solved at query level |
-| `@Transactional` at service level | Wraps read-validate-write in one DB transaction | Atomicity — no partial writes if something fails mid-operation |
-| `GlobalExceptionHandler` | One class handles all exceptions | No try-catch noise in business logic; consistent error responses |
-| `ddl-auto=validate` in prod | Schema validated on startup, never auto-modified | Prevents accidental data loss from entity/DB drift |
-| HikariCP `max-lifetime=10min` | Connections retired before MySQL kills them | Prevents stale connection errors on long-running instances |
-| Rate limiting on auth endpoints | Bucket4j token bucket, 10 req/min per IP | Mitigates brute-force login and credential stuffing attacks |
-| Profiles (dev/prod) | Separate config files per environment | Swagger off in prod, strict schema validation, no SQL noise in logs |

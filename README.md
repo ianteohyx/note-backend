@@ -20,27 +20,37 @@ cp .env.example .env
 The database values are ones you choose yourself. Docker uses them to create the MySQL user and database on first start, and the app uses the same values to connect, so they must match:
 
 - `DB_NAME` must be the database name at the end of `DB_URL` (e.g. `jdbc:mysql://localhost:3306/<DB_NAME>`).
-- `DB_USERNAME` / `DB_PASSWORD` are the credentials the container creates and the app logs in with. Pick any values.
-- `DB_ROOT_PASSWORD` is the MySQL root password. Pick any value.
+- `DB_USERNAME` / `DB_PASSWORD` — pick any values, **but not `root`** for `DB_USERNAME` (the container will fail to start).
+- `DB_ROOT_PASSWORD` — the MySQL root password. Pick a different value than `DB_PASSWORD`.
 
 MySQL only reads these on the **first** start with an empty volume. If you change them later, run `docker compose down -v` to recreate the container with the new values (this wipes the data).
 
-### 2. Start the database
+### 2. Start the backend
+
+**Option A — everything in Docker:**
 
 ```bash
-docker compose up -d
+docker compose up -d --build
 ```
 
-This starts a MySQL 8 container and creates the empty tables from `docker/schema.sql` (no data). Sign up through the API to create your first user. Data is persisted in a Docker volume, so it survives container restarts.
+Starts `db` and `app` together, builds the backend image, initializes the schema on first run. API at `http://localhost:8080`.
 
-### 3. Run the application
+**Option B — backend via your IDE/Maven, only the database in Docker:**
 
 ```bash
+docker compose up -d db
 ./mvnw spring-boot:run
 ```
 
-The server starts on `http://localhost:8080`.  
+Use this for active backend development, so your IDE's run/debug/hot-reload applies.
+
+Either way: sign up through the API to create your first user. Data persists in a Docker volume across restarts — only `docker compose down -v` wipes it.
+
 Swagger UI: `http://localhost:8080/swagger-ui.html`
+
+### 3. Frontend
+
+Separate repo: [note-frontend](https://github.com/ianteohyx/note-frontend)
 
 ## Other Commands
 
@@ -48,12 +58,25 @@ Swagger UI: `http://localhost:8080/swagger-ui.html`
 # Run tests
 ./mvnw test
 
-# Build JAR
+# Build JAR (native, no Docker)
 ./mvnw clean package
 
-# Stop the database container
+# Rebuild the backend image after a code change, then restart
+docker compose up -d --build
+
+# Follow the backend container's logs
+docker compose logs -f app
+
+# Stop containers, keep data (fast restart with `docker compose start`)
+docker compose stop
+
+# Stop and remove containers + network, keep data
 docker compose down
 
-# Stop and delete all data (wipes the volume)
+# Stop and wipe all data too — next start is a fresh DB
 docker compose down -v
 ```
+
+## Production
+
+See `docker-compose.prod.yml` for the production setup (pulls pre-built images, no `db` service — uses AWS RDS instead).
