@@ -79,4 +79,4 @@ docker compose down -v
 
 ## Production
 
-See `docker-compose.prod.yml` for the production setup (pulls pre-built images, no `db` service — uses AWS RDS instead).
+See `docker-compose.prod.yml` for the production setup (backend only — frontend is on S3 + CloudFront; pulls a pre-built image, no `db` service — uses AWS RDS instead).

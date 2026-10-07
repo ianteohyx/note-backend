@@ -245,7 +245,7 @@ Always throw these instead of returning error codes manually from services.
   - `POST /api/users/logout` takes **no body** — reads the `refreshToken` cookie, calls `RefreshTokenService.revokeRefreshToken(token)` (best-effort single-token revoke, no-op if missing/unknown/already-revoked), and responds with `RefreshTokenCookieFactory.clear()` (`Max-Age=0`, same attributes) to evict the cookie. Always 200 `SUCCESS`.
   - Cookie attributes: `HttpOnly`, `Secure` (configurable), `SameSite` (configurable), `Path` (configurable, default `/api/users`), `Max-Age` = refresh token TTL (or `0` on logout)
   - **dev profile**: `Secure=false`, `SameSite=Lax` — works over `http://localhost` and for a same-site frontend (`localhost:5173` → `localhost:8080`), and Postman sends it automatically via its cookie jar
-  - **prod profile**: `Secure=true`, `SameSite=None` — required when the deployed frontend is on a different site; also needs CORS `allowCredentials=true` (already set) and the frontend using `credentials: 'include'` / `withCredentials: true`
+  - **prod profile**: `Secure=true`, `SameSite=Lax` — frontend (S3) and API (ALB) are served from the same CloudFront domain, with CloudFront routing `/api/*` to the ALB, so requests are same-origin
 - **Token rotation**: on each refresh, old token is revoked and a new one is issued (new cookie)
 - **Security**: if a revoked token is used, ALL tokens for that user are immediately revoked
 - Cleanup: scheduled daily at 3 AM via `ScheduledTasks`
@@ -290,7 +290,7 @@ Always throw these instead of returning error codes manually from services.
 | `jwt.expiration-ms` | No | 900000 (15m) | JWT access token TTL |
 | `REFRESH_COOKIE_PATH` | No | `/api/users` | `Path` attribute of the `refreshToken` cookie |
 | `REFRESH_COOKIE_SECURE` | No (prod only) | `true` | `Secure` attribute of the `refreshToken` cookie. dev profile hard-codes `false`; prod defaults `true` |
-| `REFRESH_COOKIE_SAME_SITE` | No (prod only) | `None` | `SameSite` attribute of the `refreshToken` cookie. dev profile hard-codes `Lax`; prod defaults `None` (cross-site frontend) |
+| `REFRESH_COOKIE_SAME_SITE` | No (prod only) | `Lax` | `SameSite` attribute of the `refreshToken` cookie. dev profile hard-codes `Lax`; prod defaults `Lax` (same-origin via CloudFront) |
 
 Set in `.env` for local dev. Set as server env vars on AWS EC2 for prod.
 
