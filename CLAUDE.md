@@ -292,7 +292,7 @@ Always throw these instead of returning error codes manually from services.
 | `REFRESH_COOKIE_SECURE` | No (prod only) | `true` | `Secure` attribute of the `refreshToken` cookie. dev profile hard-codes `false`; prod defaults `true` |
 | `REFRESH_COOKIE_SAME_SITE` | No (prod only) | `Lax` | `SameSite` attribute of the `refreshToken` cookie. dev profile hard-codes `Lax`; prod defaults `Lax` (same-origin via CloudFront) |
 
-Set in `.env` for local dev. Set as server env vars on AWS EC2 for prod.
+Set in `.env` for local dev. In prod (ECS on EC2), set in the ECS task definition, with secrets from SSM Parameter Store / Secrets Manager.
 
 ---
 

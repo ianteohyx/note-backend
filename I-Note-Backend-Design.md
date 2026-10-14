@@ -196,9 +196,9 @@ The refresh token is the long-lived credential (7 days), so it is delivered wher
 | `Path` | `/api/users` | Only the refresh/logout endpoints ever receive the cookie — it isn't attached to note or share requests |
 | `Max-Age` | 7 days | Matches the DB expiry (`jwt.refresh-expiration-ms`) |
 | `Secure` | `false` in dev, `true` in prod | No HTTPS locally; required in prod |
-| `SameSite` | `Lax` in dev, `None` in prod | Prod frontend is cross-site to the API, so the cookie must be sent cross-site; dev `localhost:5173` → `localhost:8080` is same-site, so `Lax` works |
+| `SameSite` | `Lax` in dev and prod | In prod, CloudFront serves the frontend and routes `/api/*` to the backend on the same domain, so requests are same-origin; dev `localhost:5173` → `localhost:8080` is same-site. `Lax` blocks the cookie on cross-site sub-requests, which is stronger than `None` |
 
-`LoginResponse.refreshToken` is `@JsonIgnore` — the service hands the token to the controller, and the controller moves it into the cookie, so it can never be serialized into a response body by accident. Path, `Secure` and `SameSite` are all overridable via env vars (see [Configuration](#configuration--environment)); if the frontend and API ever share a site, `SameSite=Lax` is the stronger choice.
+`LoginResponse.refreshToken` is `@JsonIgnore` — the service hands the token to the controller, and the controller moves it into the cookie, so it can never be serialized into a response body by accident. Path, `Secure` and `SameSite` are all overridable via env vars (see [Configuration](#configuration--environment)) — e.g. `SameSite=None` would be needed if the frontend were ever served from a different site than the API.
 
 ### Refresh Token Security — Token Rotation + Revoke-All
 
@@ -250,6 +250,7 @@ Filters execute in this order on every request:
 - Configured per environment — `http://localhost:5173` (the Vite dev server) in dev, explicit `${CORS_ALLOWED_ORIGINS}` in prod
 - Only the known frontend origin can make credentialed cross-origin requests — no wildcard
 - Credentials: `true` — required so the browser will send the refresh-token cookie on cross-origin `/refresh` and `/logout` calls (and it is why a wildcard origin isn't allowed)
+- In prod the browser calls the API through the same CloudFront domain as the frontend, so requests are same-origin and CORS doesn't come into play; `CORS_ALLOWED_ORIGINS` is still set (to the CloudFront URL) because the prod profile requires it
 
 ### CSRF
 
@@ -444,7 +445,7 @@ Spring profile system separates dev and prod config cleanly:
 | Swagger UI | Enabled | **Disabled** |
 | CORS origin | `http://localhost:5173` | `${CORS_ALLOWED_ORIGINS}` |
 | Refresh cookie `Secure` | `false` (no HTTPS locally) | `true` (`${REFRESH_COOKIE_SECURE}`) |
-| Refresh cookie `SameSite` | `Lax` | `None` (`${REFRESH_COOKIE_SAME_SITE}`) |
+| Refresh cookie `SameSite` | `Lax` | `Lax` (`${REFRESH_COOKIE_SAME_SITE}`) |
 
 Active profile set by `SPRING_PROFILES_ACTIVE` env var — `dev` in `.env` locally, `prod` on the server.
 
@@ -464,9 +465,9 @@ All secrets live in environment variables — never hardcoded, never committed t
 | `REFRESH_TOKEN_EXPIRATION_MS` | Optional — refresh token / cookie lifetime, default 7 days |
 | `REFRESH_COOKIE_PATH` | Optional — cookie path, default `/api/users` |
 | `REFRESH_COOKIE_SECURE` | Optional, prod — default `true` |
-| `REFRESH_COOKIE_SAME_SITE` | Optional, prod — default `None` |
+| `REFRESH_COOKIE_SAME_SITE` | Optional, prod — default `Lax` |
 
-Locally loaded from `.env` via `spring-dotenv`. On AWS, set as system environment variables on the EC2 instance.
+Locally loaded from `.env` via `spring-dotenv`. On AWS, set in the ECS task definition, with `DB_PASSWORD` and `JWT_SECRET` pulled from SSM Parameter Store / Secrets Manager.
 
 ---
 
@@ -502,42 +503,62 @@ healthcheck:
 
 Deliberately not a plain `mysqladmin ping`. MySQL's own entrypoint runs a brief internal bootstrap server (to create users/run init scripts) before restarting into the real one — a plain ping can succeed against that *temporary* server, reporting `healthy` moments before a restart `app`'s `depends_on: condition: service_healthy` would then race against. Logging in as the actual app user and querying the actual app database can only succeed once the final server is up **and** that user/grant genuinely exists — the same two things `app` itself needs, so "db reports healthy" and "app's connection will work" become the same guarantee instead of two things that could silently disagree.
 
-### Separate frontend/backend repos, separate images, same network in prod
+### Separate frontend/backend repos
 
-Frontend (`note-frontend`) and backend are deliberately kept as two repos with two Dockerfiles, not merged into a monorepo — they share no build toolchain (Maven vs. npm), no base image, and can be released independently. In production, both images land in the same `docker-compose.prod.yml`, sharing one Docker network, so the frontend's Nginx can reverse-proxy `/api/*` to `app:8080` by service name — same-origin from the browser's perspective, so no CORS configuration is needed for that path at all. Locally, the frontend instead runs as a fully standalone container (`BACKEND_URL=http://host.docker.internal:8080`), reaching the backend through its published port rather than a shared network — deliberately avoided in daily dev, since it would otherwise require the two repos to be checked out as siblings just to build a compose file together.
+Frontend (`note-frontend`) and backend are deliberately kept as two repos, not merged into a monorepo — they share no build toolchain (Maven vs. npm) and can be released independently. Only the backend is a container in production; the frontend is a static build on S3 + CloudFront (see [AWS Hosting](#aws-hosting)).
 
-### Production compose — images only, never `build:`
+### Production compose — image only, never `build:`
 
-`docker-compose.prod.yml` has no `build:` anywhere — both `app` and the frontend's `web` service use `image: ${BACKEND_IMAGE}` / `${FRONTEND_IMAGE}`, pulled from a registry once CI is wired up to push them. The server never checks out source or runs Maven/npm at all; it only ever runs `docker compose pull && docker compose up -d`. `pull_policy: missing` on both services is deliberate: the explicit `pull` step is what fetches anything new, so `up` shouldn't redundantly re-pull (and risk a hard failure if the registry is briefly unreachable).
+`docker-compose.prod.yml` runs only the backend `app` service from `image: ${BACKEND_IMAGE}` (the ECR image) — no `build:`, no `db` (RDS instead). It's for running the image directly with Docker on a server; under ECS the same settings live in the task definition instead. `pull_policy: missing` is deliberate: the explicit `docker compose pull` step is what fetches anything new, so `up` doesn't redundantly re-pull (and risk a hard failure if the registry is briefly unreachable).
 
 ## AWS Hosting
 
 ### Infrastructure
 
 ```
-Internet
-    │
+Browser
+    │  one domain (CloudFront)
     ▼
-EC2 Instance (ap-southeast-2)
-  └── Docker: app container (pulled image) + web container (frontend, pulled image)
-         │
-         ▼ (private VPC subnet)
-RDS MySQL Instance (ap-southeast-2)
-  └── MySQL 8.0
+CloudFront
+  ├── /*      → S3 bucket (frontend static build, private, via Origin Access Control)
+  └── /api/*  → ALB
+                  │
+                  ▼
+            ECS service (ECS on EC2, ap-southeast-2)
+              └── backend task: container pulled from ECR, port 8080
+                  │
+                  ▼ (private subnet)
+            RDS MySQL 8 (ap-southeast-2)
 ```
 
-### EC2 — Application Server
+All resources live in `ap-southeast-2`; CloudFront is global.
 
-- `app` and `web` run as containers (`docker-compose.prod.yml`), not a bare JAR on the instance — images built in CI, pulled from a registry, never built on EC2 itself
-- Runs on EC2 in the same AWS region as RDS
-- Environment variables set on the instance — no `.env` file on server
-- `SPRING_PROFILES_ACTIVE=prod` activates production config
+### Frontend — S3 + CloudFront
+
+- The frontend is a static Vite build (`npm run build` → `dist/`) synced to a private S3 bucket. No frontend container in production.
+- CloudFront serves it and also routes `/api/*` to the ALB, so the browser sees **one origin** for both the app and the API.
+- **Why one origin matters:** requests are same-origin, so no CORS is involved, and the refresh cookie can be `SameSite=Lax` instead of `None`. HTTPS comes from CloudFront, which satisfies the cookie's `Secure` flag.
+
+### ALB — Load Balancer
+
+- CloudFront's `/api/*` origin. Forwards to a target group that ECS registers the backend tasks into automatically.
+- Health checks the tasks and only sends traffic to healthy ones.
+- Its security group only needs to accept traffic from CloudFront (the `com.amazonaws.global.cloudfront.origin-facing` managed prefix list).
+
+### ECS on EC2 — Application Server
+
+- The backend image is built for `linux/amd64`, pushed to **ECR**, and run by an **ECS service** on EC2 container instances (ECS-optimized AMI) — never built on the server.
+- The **task definition** holds the image URI, port mapping (container port 8080), and environment: `SPRING_PROFILES_ACTIVE=prod`, `DB_URL`, `CORS_ALLOWED_ORIGINS`, etc. Secrets (`DB_PASSWORD`, `JWT_SECRET`) come from SSM Parameter Store / Secrets Manager, not plain values.
+- The service keeps the desired number of tasks running and replaces crashed ones; a deploy is "push a new image → update the service."
+- Logs go to CloudWatch Logs via the `awslogs` driver.
+- Roles: the **instance role** (`AmazonEC2ContainerServiceforEC2Role`) lets the instance join the cluster; the **task execution role** lets ECS pull from ECR and read the secrets.
 
 ### RDS — Database
 
-- Managed MySQL 8 on AWS RDS
-- In the same VPC as EC2 — traffic never leaves AWS's private network
-- EC2 connects via JDBC URL: `jdbc:mysql://<rds-endpoint>:3306/note_app`
+- Managed MySQL 8 on AWS RDS, in a private subnet — not publicly accessible
+- Its security group allows port 3306 only from the backend's security group
+- Backend connects via JDBC URL: `jdbc:mysql://<rds-endpoint>:3306/i-note-db`
+- Schema is created once from `docker/schema.sql` (prod runs `ddl-auto=validate`, so the app never creates or alters tables itself)
 - RDS handles automated backups, patching, and failover
 
 ### Why RDS over self-managed MySQL
