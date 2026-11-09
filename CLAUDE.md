@@ -60,6 +60,15 @@ src/main/java/com/yx/note_app/
 | POST | `/api/users/refresh` | RefreshTokenRequestService | Reads `refreshToken` cookie, rotates it (new cookie), returns new JWT. No request body. |
 | POST | `/api/users/logout` | (controller → RefreshTokenService) | Reads `refreshToken` cookie, revokes that token, and returns a `Set-Cookie` that clears it (`Max-Age=0`). No request body. Idempotent — always 200 `SUCCESS`, even with a missing/unknown/already-revoked cookie. |
 
+### Health (Spring Boot Actuator, no auth, not rate limited)
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/actuator/health` | Overall status (includes a DB check). Body is `{"status":"UP"}` only (`show-details=never`) |
+| GET | `/actuator/health/liveness` | App-is-running probe, no DB check. Intended ALB target group health check path |
+| GET | `/actuator/health/readiness` | Readiness probe |
+
+Only `health` is exposed (`management.endpoints.web.exposure.include=health`). `SecurityConfig` allows these through via `anyRequest().permitAll()`. CloudFront only routes `/api/*` to the ALB, so these are not reachable from the public domain.
+
 ### Protected (requires `Authorization: Bearer <token>`)
 | Method | Path | Service | Description |
 |--------|------|---------|-------------|
@@ -337,3 +346,13 @@ All paginated list queries use `JOIN FETCH` to avoid N+1:
 - `ShareNoteRepository.findBySharedToUser(user, pageable)` — fetches `note`, `note.author`, and `sharedToUser` in same query
 
 All `@ManyToOne` relations are `FetchType.LAZY` by default. Always use `JOIN FETCH` in queries that iterate over results.
+
+---
+
+## CI/CD (GitHub Actions)
+
+`.github/workflows/ci-cd.yml`:
+- **Pull request:** `./mvnw -B test` only.
+- **Push to `main`:** tests, then (job `deploy`, GitHub environment `production`) build the image for `linux/amd64`, push it to ECR tagged with the commit SHA, copy the latest `note-app-backend` task definition with only the image replaced, and deploy it to the ECS service, waiting for it to be stable (rolling update 100/200).
+- **AWS access:** OIDC, no stored keys. The job assumes the role in the repo variable `AWS_DEPLOY_ROLE_ARN` (set under Settings → Secrets and variables → Actions → Variables). Env vars, secrets and sizing stay in the AWS task definition, not in the repo.
+- **Rollback:** point the ECS service at the previous task definition revision.
